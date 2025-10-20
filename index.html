@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="origin-trial" content="Ax7JuieW59rSrLiE9ZFENDdl99PnRSzSidCpjOvzvnfc1TwshrHJoZtWbtCBOPiraDXurq94s3JOnAGIsSxxVw4AAABxeyJvcmlnaW4iOiJodHRwOi8vbG9jYWxob3N0OjUxNzMiLCJmZWF0dXJlIjoiQUlQcm9tcHRBUElNdWx0aW1vZGFsSW5wdXQiLCJleHBpcnkiOjE3NzQzMTA0MDAsImlzVGhpcmRQYXJ0eSI6dHJ1ZX0=" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Describe Your Ideal Movie</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- test -->
+    <div class="bg-decor"></div>
+  <header class="page-header home-header">
+      <div class="header-top">
+        <div class="brand-left">
+          <img class="brand-logo" src="assets/img_v3_02r2_09222bfc-bdf2-41af-88a0-d0c7e6bb5feg.png" alt="Mood2Movie logo" />
+          <h1 class="site-title">Mood2Movie</h1>
+        </div>
+        <nav class="top-nav" aria-label="Primary">
+          <a id="account-link" href="auth.html" class="btn-link" aria-label="Account">Account</a>
+          <a href="profile.html" class="btn-link" aria-label="My Movies">My Movies</a>
+        </nav>
+        <span id="user-badge" class="user-badge" aria-live="polite"></span>
+      </div>
+      <h1 class="title">
+        <span>Describe your</span>
+        <span class="accent">ideal movie</span>
+      </h1>
+      <p class="site-tagline">Your vibe leads the way to your next favorite movie.</p>
+    </header>
+
+    <main class="container">
+      <section class="card">
+        <label class="label" for="wish">Describe the genre, plot, or mood you’re interested in, and I’ll match movies to it.</label>
+        <textarea id="wish" class="wish" rows="4" placeholder="Looking for a heartwarming film with light humor and coming-of-age vibes—something moving and uplifting…"></textarea>
+
+        <div class="actions">
+          <button id="go" class="btn-primary">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 12l18-9-9 18-2-7-7-2z" fill="currentColor"/>
+            </svg>
+            Generate
+          </button>
+          <button id="stop" class="btn-link" aria-label="Stop generation">Stop</button>
+        </div>
+      </section>
+
+      
+
+      <section class="card card-chips">
+        <div class="chips-title">
+          <svg class="chip-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 14H7v-2h6v2zm4-4H7V10h10v2zm0-4H7V6h10v2z" fill="#FF7A59"/>
+          </svg>
+          Try these prompt ideas
+        </div>
+        <div class="chips" id="chips">
+          <button class="chip">A coming-of-age film about friendship and growing up</button>
+          <button class="chip">A lighthearted comedy to unwind at night</button>
+          <button class="chip">A mystery thriller with unexpected twists</button>
+          <button class="chip">A heartwarming, feel-good movie for family viewing</button>
+          <button class="chip">A sci-fi adventure exploring the unknown universe</button>
+          <button class="chip">An inspiring sports film about perseverance and courage</button>
+        </div>
+      </section>
+
+      <section class="card results" id="results-card" hidden>
+        <div class="results-header">
+          <div class="results-meta">
+            <strong>Recommendations</strong>
+            <span id="status" class="status"></span>
+            <span id="count" class="count"></span>
+          </div>
+          <button id="refresh" class="btn-link refresh-btn" aria-label="Refresh batch">Refresh Batch</button>
+        </div>
+        <div id="download" class="download" hidden>
+          <div class="bar"><span id="bar-inner"></span></div>
+          <div class="download-text">First-time use downloads a local model. Please wait… <span id="download-pct">0%</span></div>
+        </div>
+        <!-- Generating quotes (handwritten, auto-rotating) -->
+        <div id="gen-quotes" class="gen-quotes" hidden>
+          <span id="gen-quote" class="gen-quote">Popcorn’s popping, mood’s loading…</span>
+        </div>
+        <div id="cards" class="ticket-grid"></div>
+        <article id="result" class="result-text" aria-live="polite" hidden></article>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-top">© 2025 Mood2Movie  Let AI help you find the perfect movie</div>
+      <div class="tmdb-badge" aria-label="TMDB attribution">
+        <a href="https://www.themoviedb.org" target="_blank" rel="noopener">
+          <img class="tmdb-logo" alt="TMDB" src="assets/tmdb-official.svg">
+        </a>
+        <span class="tmdb-disclaimer">This product uses the TMDB API but is not endorsed or certified by TMDB.</span>
+      </div>
+    </footer>
+
+    <div id="toast" class="toast" aria-live="polite" aria-hidden="true"></div>
+    <!-- Force single local origin (localhost:8000) to keep session consistent -->
+    <script>
+      (function() {
+        try {
+          const hostOk = location.hostname === 'localhost';
+          const portOk = location.port === '8000';
+          if (!hostOk || !portOk) {
+            const target = `http://localhost:8000${location.pathname}${location.search}${location.hash}`;
+            window.location.replace(target);
+            return;
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" src="debug.js"></script>
+    <!-- Supabase client (ESM) -->
+    <script type="module">
+      import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.6/+esm';
+      const SUPABASE_URL = location.origin + '/supabase';
+      const SUPABASE_ANON_KEY = 'sb_publishable_8MCFTES3t64IIOhQScgy5A_bcaaWYdL';
+      window.supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
+      });
+      if (window.M2M_DEBUG) window.M2M_DEBUG.log('SUPABASE_INIT', { SUPABASE_URL, anonKeyPresent: !!SUPABASE_ANON_KEY });
+      async function updateBadge() {
+        try {
+          const ub = document.getElementById('user-badge');
+          if (!ub) return;
+          const { data } = await window.supabaseClient.auth.getSession();
+          let user = data?.session?.user || null;
+          // Fallback: try recover from localStorage if SDK hasn’t hydrated yet
+          if (!user) {
+            try {
+              const keys = Object.keys(localStorage);
+              const key = keys.find(k => k.startsWith('sb-') && k.endsWith('-auth-token')) || keys.find(k => k.startsWith('sb-') && k.includes('auth-token'));
+              if (key) {
+                const raw = localStorage.getItem(key);
+                const parsed = JSON.parse(raw || '{}');
+                user = parsed?.currentSession?.user || parsed?.user || null;
+              }
+            } catch {}
+          }
+          const displayName = user ? (user.user_metadata?.full_name || user.email || user.id) : null;
+          ub.textContent = displayName || 'Not signed in';
+        } catch {
+          const ub = document.getElementById('user-badge');
+          if (ub) ub.textContent = 'Not signed in';
+        }
+      }
+      // Ensure session is initialized from OAuth redirect and update badge
+      try {
+        const { data } = await window.supabaseClient.auth.getSession();
+        if (window.M2M_DEBUG) window.M2M_DEBUG.log('GET_SESSION', { hasUser: !!data?.session?.user, expires_at: data?.session?.expires_at });
+      } catch (e) {
+        if (window.M2M_DEBUG) window.M2M_DEBUG.log('GET_SESSION_ERROR', { message: e?.message || String(e) });
+      }
+      updateBadge();
+      try {
+        window.supabaseClient.auth.onAuthStateChange((event, session) => {
+          if (window.M2M_DEBUG) window.M2M_DEBUG.log('AUTH_EVENT', { event, hasUser: !!session?.user, expires_at: session?.expires_at });
+          updateBadge();
+        });
+      } catch {}
+    </script>
+    <script type="module" src="script.js?v=3"></script>
+  </body>
+</html>

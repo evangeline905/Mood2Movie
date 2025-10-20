@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Account · Mood2Movie</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .auth-page { display: flex; justify-content: center; }
+      .auth-card { max-width: 520px; margin: 24px auto; }
+      .auth-actions { display: flex; flex-direction: column; gap: 12px; }
+      .oauth-btn { display: inline-flex; align-items: center; gap: 8px; justify-content: center; padding: 10px 14px; border-radius: 12px; border: 1px solid #ffe1d0; background: #fff7f2; color: #8a5a4d; font-weight: 700; cursor: pointer; }
+      .oauth-btn:hover { filter: brightness(1.04); }
+      .oauth-logo { width: 18px; height: 18px; }
+      .auth-status { color: #a06146; font-weight: 600; }
+      .auth-help { font-size: 13px; color: #8a5a4d; }
+    </style>
+  </head>
+  <body>
+    <header class="page-header">
+      <img class="brand-logo" src="assets/img_v3_02r2_09222bfc-bdf2-41af-88a0-d0c7e6bb5feg.png" alt="Mood2Movie logo" />
+      <h1 class="title">
+        <span>Account</span>
+        <span class="accent">Sign in</span>
+      </h1>
+    </header>
+
+    <main class="container auth-page">
+      <section class="card auth-card">
+        <h3>Sign in to sync favourites</h3>
+        <p class="auth-help">Use Google to create or sign in to your account. After login, your Favourite marks will sync to cloud.</p>
+        <div class="auth-actions">
+          <button id="google-signin" class="oauth-btn" type="button">
+            <img class="oauth-logo" alt="Google" src="https://www.gstatic.com/images/branding/product/1x/googleg_64dp.png" />
+            Continue with Google
+          </button>
+          <button id="signout" class="oauth-btn" type="button">Sign out</button>
+          <a class="btn-link" href="index.html" aria-label="Back to Home">← Back to Home</a>
+          <div id="whoami" class="auth-status"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Force single local origin (localhost:8000) to keep session consistent -->
+    <script>
+      (function() {
+        try {
+          const hostOk = location.hostname === 'localhost';
+          const portOk = location.port === '8000';
+          if (!hostOk || !portOk) {
+            const target = `http://localhost:8000${location.pathname}${location.search}${location.hash}`;
+            window.location.replace(target);
+            return;
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" src="debug.js"></script>
+    <!-- Supabase client (ESM) -->
+    <script type="module">
+      import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.6/+esm';
+      const SUPABASE_URL = location.origin + '/supabase';
+      const SUPABASE_ANON_KEY = 'sb_publishable_8MCFTES3t64IIOhQScgy5A_bcaaWYdL';
+      const supabase = (window.supabaseClient ||= createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
+      }));
+      if (window.M2M_DEBUG) window.M2M_DEBUG.log('SUPABASE_INIT', { SUPABASE_URL });
+
+      const who = document.getElementById('whoami');
+      const signOutBtn = document.getElementById('signout');
+      const googleBtn = document.getElementById('google-signin');
+
+      async function refreshUser() {
+        const { data } = await supabase.auth.getSession();
+        const user = data?.session?.user || null;
+        if (user) {
+          who.textContent = `Signed in as ${user.email || user.id}`;
+        } else {
+          who.textContent = 'Not signed in';
+        }
+      }
+
+      googleBtn.addEventListener('click', async () => {
+        try {
+          if (window.M2M_DEBUG) window.M2M_DEBUG.log('OAUTH_CLICK', { redirectTo: location.origin + '/index.html' });
+          await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+              redirectTo: location.origin + '/index.html',
+            },
+          });
+        } catch (e) {
+          if (window.M2M_DEBUG) window.M2M_DEBUG.log('OAUTH_ERROR', { message: e?.message || String(e) });
+          alert('Google sign-in failed: ' + (e?.message || e));
+        }
+      });
+
+      signOutBtn.addEventListener('click', async () => {
+        if (window.M2M_DEBUG) window.M2M_DEBUG.log('SIGN_OUT_CLICK');
+        // 强制确保点击后回到首页，即使无会话或网络异常
+        let redirected = false;
+        const doRedirect = () => {
+          if (redirected) return;
+          redirected = true;
+          try { window.location.replace('index.html'); } catch { window.location.href = 'index.html'; }
+        };
+        const fallback = setTimeout(doRedirect, 1500);
+
+        try {
+          // 按钮反馈与防重复点击
+          signOutBtn.disabled = true;
+          signOutBtn.textContent = 'Signing out…';
+
+          // 尝试读取会话（不论是否存在都继续执行）
+          try { await supabase.auth.getSession(); } catch {}
+
+          // 触发登出（若无会话，该调用会快速返回）
+          try { await supabase.auth.signOut(); } catch {}
+
+          // 刷新用户显示
+          await refreshUser();
+        } finally {
+          clearTimeout(fallback);
+          signOutBtn.textContent = 'Sign out';
+          signOutBtn.disabled = false;
+          if (window.M2M_DEBUG) window.M2M_DEBUG.log('SIGN_OUT_DONE');
+          doRedirect();
+        }
+      });
+
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        if (window.M2M_DEBUG) window.M2M_DEBUG.log('AUTH_EVENT', { event, hasUser: !!session?.user, expires_at: session?.expires_at });
+        await refreshUser();
+        if (event === 'SIGNED_IN') {
+          window.location.href = 'index.html';
+        }
+      });
+      // Ensure session after redirect
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (window.M2M_DEBUG) window.M2M_DEBUG.log('GET_SESSION', { hasUser: !!data?.session?.user, expires_at: data?.session?.expires_at });
+      } catch (e) {
+        if (window.M2M_DEBUG) window.M2M_DEBUG.log('GET_SESSION_ERROR', { message: e?.message || String(e) });
+      }
+      refreshUser();
+    </script>
+  </body>
+</html>
