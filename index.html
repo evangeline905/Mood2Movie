@@ -4,17 +4,25 @@
     <meta charset="utf-8" />
     <meta http-equiv="origin-trial" content="Ax7JuieW59rSrLiE9ZFENDdl99PnRSzSidCpjOvzvnfc1TwshrHJoZtWbtCBOPiraDXurq94s3JOnAGIsSxxVw4AAABxeyJvcmlnaW4iOiJodHRwOi8vbG9jYWxob3N0OjUxNzMiLCJmZWF0dXJlIjoiQUlQcm9tcHRBUElNdWx0aW1vZGFsSW5wdXQiLCJleHBpcnkiOjE3NzQzMTA0MDAsImlzVGhpcmRQYXJ0eSI6dHJ1ZX0=" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Describe Your Ideal Movie</title>
+    <title>Mood2Movie · Describe Your Ideal Movie</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css" />
+    <style>
+      .btn-link.disabled {
+        pointer-events: none;
+        opacity: 0.45;
+        filter: grayscale(0.2);
+      }
+    </style>
   </head>
+
   <body>
-    <!-- test1234 4=5678 -->
     <div class="bg-decor"></div>
-  <header class="page-header home-header">
+
+    <header class="page-header home-header">
       <div class="header-top">
         <div class="brand-left">
           <img class="brand-logo" src="assets/img_v3_02r2_09222bfc-bdf2-41af-88a0-d0c7e6bb5feg.png" alt="Mood2Movie logo" />
@@ -22,9 +30,9 @@
         </div>
         <nav class="top-nav" aria-label="Primary">
           <a id="account-link" href="auth.html" class="btn-link" aria-label="Account">Account</a>
-          <a href="profile.html" class="btn-link" aria-label="My Movies">My Movies</a>
+          <a id="my-movies-link" href="profile.html" class="btn-link disabled" aria-label="My Movies" aria-disabled="true" tabindex="-1">My Movies</a>
         </nav>
-        <span id="user-badge" class="user-badge" aria-live="polite"></span>
+        <span id="user-badge" class="user-badge" aria-live="polite">Not signed in</span>
       </div>
       <h1 class="title">
         <span>Describe your</span>
@@ -48,8 +56,6 @@
           <button id="stop" class="btn-link" aria-label="Stop generation">Stop</button>
         </div>
       </section>
-
-      
 
       <section class="card card-chips">
         <div class="chips-title">
@@ -81,7 +87,6 @@
           <div class="bar"><span id="bar-inner"></span></div>
           <div class="download-text">First-time use downloads a local model. Please wait… <span id="download-pct">0%</span></div>
         </div>
-        <!-- Generating quotes (handwritten, auto-rotating) -->
         <div id="gen-quotes" class="gen-quotes" hidden>
           <span id="gen-quote" class="gen-quote">Popcorn’s popping, mood’s loading…</span>
         </div>
@@ -91,7 +96,7 @@
     </main>
 
     <footer class="footer">
-      <div class="footer-top">© 2025 Mood2Movie  Let AI help you find the perfect movie</div>
+      <div class="footer-top">© 2025 Mood2Movie — Let AI help you find the perfect movie</div>
       <div class="tmdb-badge" aria-label="TMDB attribution">
         <a href="https://www.themoviedb.org" target="_blank" rel="noopener">
           <img class="tmdb-logo" alt="TMDB" src="assets/tmdb-official.svg">
@@ -101,74 +106,199 @@
     </footer>
 
     <div id="toast" class="toast" aria-live="polite" aria-hidden="true"></div>
-    <!-- Force single local origin (localhost:8000) to keep session consistent -->
-    <script>
-      (function() {
-        try {
-          const hostOk = location.hostname === 'localhost';
-          const portOk = location.port === '8000';
-          if (!hostOk || !portOk) {
-            const target = `http://localhost:8000${location.pathname}${location.search}${location.hash}`;
-            window.location.replace(target);
-            return;
-          }
-        } catch (e) {}
-      })();
-    </script>
+
     <script type="module" src="debug.js"></script>
-    <!-- Supabase client (ESM) -->
+
+    <!-- ✅ Supabase 统一域名 + 登录状态控制 -->
     <script type="module">
       import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.6/+esm';
-      const SUPABASE_URL = location.origin + '/supabase';
+
+      const SUPABASE_URL = 'https://emnvezsluaulmnoitrle.supabase.co';
       const SUPABASE_ANON_KEY = 'sb_publishable_8MCFTES3t64IIOhQScgy5A_bcaaWYdL';
-      window.supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+
+      // 禁用 Supabase 的自动会话管理，我们手动管理
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-        },
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false
+        }
       });
-      if (window.M2M_DEBUG) window.M2M_DEBUG.log('SUPABASE_INIT', { SUPABASE_URL, anonKeyPresent: !!SUPABASE_ANON_KEY });
-      async function updateBadge() {
-        try {
-          const ub = document.getElementById('user-badge');
-          if (!ub) return;
-          const { data } = await window.supabaseClient.auth.getSession();
-          let user = data?.session?.user || null;
-          // Fallback: try recover from localStorage if SDK hasn’t hydrated yet
-          if (!user) {
-            try {
-              const keys = Object.keys(localStorage);
-              const key = keys.find(k => k.startsWith('sb-') && k.endsWith('-auth-token')) || keys.find(k => k.startsWith('sb-') && k.includes('auth-token'));
-              if (key) {
-                const raw = localStorage.getItem(key);
-                const parsed = JSON.parse(raw || '{}');
-                user = parsed?.currentSession?.user || parsed?.user || null;
-              }
-            } catch {}
-          }
-          const displayName = user ? (user.user_metadata?.full_name || user.email || user.id) : null;
-          ub.textContent = displayName || 'Not signed in';
-        } catch {
-          const ub = document.getElementById('user-badge');
-          if (ub) ub.textContent = 'Not signed in';
+
+      const badge  = document.getElementById('user-badge');
+      const myLink = document.getElementById('my-movies-link');
+
+      function setMyMoviesEnabled(enabled) {
+        if (!myLink) return;
+        myLink.classList.toggle('disabled', !enabled);
+        if (enabled) {
+          myLink.removeAttribute('aria-disabled');
+          myLink.removeAttribute('tabindex');
+        } else {
+          myLink.setAttribute('aria-disabled', 'true');
+          myLink.setAttribute('tabindex', '-1');
         }
       }
-      // Ensure session is initialized from OAuth redirect and update badge
-      try {
-        const { data } = await window.supabaseClient.auth.getSession();
-        if (window.M2M_DEBUG) window.M2M_DEBUG.log('GET_SESSION', { hasUser: !!data?.session?.user, expires_at: data?.session?.expires_at });
-      } catch (e) {
-        if (window.M2M_DEBUG) window.M2M_DEBUG.log('GET_SESSION_ERROR', { message: e?.message || String(e) });
+
+      async function updateUI() {
+        try {
+          // 首先尝试从 localStorage 恢复会话
+          const storedSession = localStorage.getItem('supabase.auth.token');
+          if (storedSession) {
+            try {
+              const sessionData = JSON.parse(storedSession);
+              console.log('Found stored session for:', sessionData.user?.email);
+              
+              // 检查会话是否过期
+              if (sessionData.expires_at) {
+                const expiresAt = new Date(sessionData.expires_at * 1000);
+                const now = new Date();
+                console.log('Session expires at:', expiresAt, 'Current time:', now);
+                
+                if (expiresAt > now) {
+                  console.log('Session is valid, using stored session');
+                  badge.textContent = sessionData.user.user_metadata?.full_name || sessionData.user.email || sessionData.user.id;
+                  setMyMoviesEnabled(true);
+                  return;
+                } else {
+                  console.log('Stored session expired, removing...');
+                  localStorage.removeItem('supabase.auth.token');
+                }
+              } else {
+                console.log('No expiration time, using stored session');
+                badge.textContent = sessionData.user.user_metadata?.full_name || sessionData.user.email || sessionData.user.id;
+                setMyMoviesEnabled(true);
+                return;
+              }
+            } catch (parseError) {
+              console.error('Error parsing stored session:', parseError);
+              localStorage.removeItem('supabase.auth.token');
+            }
+          }
+          
+          // 如果没有存储的会话或已过期，显示未登录状态
+          console.log('No valid stored session found');
+          badge.textContent = 'Not signed in';
+          setMyMoviesEnabled(false);
+        } catch (error) {
+          console.error('Error checking session:', error);
+          badge.textContent = 'Not signed in';
+          setMyMoviesEnabled(false);
+        }
       }
-      updateBadge();
-      try {
-        window.supabaseClient.auth.onAuthStateChange((event, session) => {
-          if (window.M2M_DEBUG) window.M2M_DEBUG.log('AUTH_EVENT', { event, hasUser: !!session?.user, expires_at: session?.expires_at });
-          updateBadge();
-        });
-      } catch {}
+
+      // 调试函数：打印会话状态
+      async function debugSession(prefix = '') {
+        try {
+          const { data } = await supabase.auth.getSession();
+          console.log(prefix + ' Session state:', {
+            hasSession: !!data?.session,
+            hasUser: !!data?.session?.user,
+            token: data?.session?.access_token?.slice(0, 10) + '...',
+            storage: localStorage.getItem(AUTH_STORAGE_KEY)?.slice(0, 10) + '...',
+          });
+        } catch (e) {
+          console.error(prefix + ' Session check error:', e);
+        }
+      }
+
+      // 尝试从 localStorage 恢复会话
+      async function restoreSession() {
+        try {
+          const storedSession = localStorage.getItem('supabase.auth.token');
+          if (storedSession) {
+            const sessionData = JSON.parse(storedSession);
+            console.log('Found stored session for:', sessionData.user?.email);
+            
+            // 刷新会话
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (error) throw error;
+            
+            if (session?.user) {
+              console.log('Session restored for:', session.user.email);
+              badge.textContent = session.user.email;
+              setMyMoviesEnabled(true);
+              return true;
+            }
+          }
+          return false;
+        } catch (error) {
+          console.error('Failed to restore session:', error);
+          return false;
+        }
+      }
+
+      // 初始化会话
+      async function initSession() {
+        try {
+          // 先尝试恢复存储的会话
+          const restored = await restoreSession();
+          if (restored) {
+            console.log('Session restored successfully');
+            return;
+          }
+
+          // 如果没有存储的会话，检查当前会话
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (error) throw error;
+          
+          if (session?.user) {
+            console.log('Active session found:', session.user.email);
+            badge.textContent = session.user.email;
+            setMyMoviesEnabled(true);
+            
+            // 保存会话信息
+            const sessionData = {
+              user: session.user,
+              access_token: session.access_token,
+              refresh_token: session.refresh_token,
+              expires_at: session.expires_at
+            };
+            localStorage.setItem('supabase.auth.token', JSON.stringify(sessionData));
+          } else {
+            console.log('No active session');
+            badge.textContent = 'Not signed in';
+            setMyMoviesEnabled(false);
+          }
+        } catch (error) {
+          console.error('Session initialization error:', error);
+          badge.textContent = 'Not signed in';
+          setMyMoviesEnabled(false);
+        }
+      }
+
+      // 完全禁用 Supabase 的认证状态监听器
+      // supabase.auth.onAuthStateChange(async (event, session) => {
+      //   console.log('Auth state changed:', event, session?.user?.email);
+      //   
+      //   if (session?.user) {
+      //     // 更新 UI
+      //     badge.textContent = session.user.email;
+      //     setMyMoviesEnabled(true);
+      //     
+      //     // 保存会话信息
+      //     const sessionData = {
+      //       user: session.user,
+      //       access_token: session.access_token,
+      //       refresh_token: session.refresh_token,
+      //       expires_at: session.expires_at
+      //     };
+      //     localStorage.setItem('supabase.auth.token', JSON.stringify(sessionData));
+      //   } else {
+      //     badge.textContent = 'Not signed in';
+      //     setMyMoviesEnabled(false);
+      //     localStorage.removeItem('supabase.auth.token');
+      //   }
+      // });
+
+      // 初始化
+      await updateUI();
+      
+      // 不监听 Supabase 的认证状态变化，我们手动管理
+      // supabase.auth.onAuthStateChange(updateUI);
     </script>
+
     <script type="module" src="script.js?v=3"></script>
+    
   </body>
 </html>

@@ -39,116 +39,176 @@
           </button>
           <button id="signout" class="oauth-btn" type="button">Sign out</button>
           <a class="btn-link" href="index.html" aria-label="Back to Home">← Back to Home</a>
-          <div id="whoami" class="auth-status"></div>
+          <div id="whoami" class="auth-status">Not signed in</div>
         </div>
       </section>
     </main>
 
-    <!-- Force single local origin (localhost:8000) to keep session consistent -->
-    <script>
-      (function() {
-        try {
-          const hostOk = location.hostname === 'localhost';
-          const portOk = location.port === '8000';
-          if (!hostOk || !portOk) {
-            const target = `http://localhost:8000${location.pathname}${location.search}${location.hash}`;
-            window.location.replace(target);
-            return;
-          }
-        } catch (e) {}
-      })();
-    </script>
     <script type="module" src="debug.js"></script>
-    <!-- Supabase client (ESM) -->
+
     <script type="module">
       import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.6/+esm';
-      const SUPABASE_URL = location.origin + '/supabase';
+
+      const SUPABASE_URL = 'https://emnvezsluaulmnoitrle.supabase.co';
       const SUPABASE_ANON_KEY = 'sb_publishable_8MCFTES3t64IIOhQScgy5A_bcaaWYdL';
-      const supabase = (window.supabaseClient ||= createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-        },
-      }));
-      if (window.M2M_DEBUG) window.M2M_DEBUG.log('SUPABASE_INIT', { SUPABASE_URL });
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false
+        }
+      });
 
       const who = document.getElementById('whoami');
       const signOutBtn = document.getElementById('signout');
       const googleBtn = document.getElementById('google-signin');
 
       async function refreshUser() {
-        const { data } = await supabase.auth.getSession();
-        const user = data?.session?.user || null;
-        if (user) {
-          who.textContent = `Signed in as ${user.email || user.id}`;
-        } else {
+        try {
+          // 使用手动管理的会话数据
+          const storedSession = localStorage.getItem('supabase.auth.token');
+          if (storedSession) {
+            const sessionData = JSON.parse(storedSession);
+            const user = sessionData.user || null;
+            who.textContent = user ? `Signed in as ${user.email || user.id}` : 'Not signed in';
+          } else {
+            who.textContent = 'Not signed in';
+          }
+        } catch (error) {
+          console.error('Error checking session:', error);
           who.textContent = 'Not signed in';
         }
       }
 
+      // 触发登录
       googleBtn.addEventListener('click', async () => {
-        try {
-          if (window.M2M_DEBUG) window.M2M_DEBUG.log('OAUTH_CLICK', { redirectTo: location.origin + '/index.html' });
-          await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-              redirectTo: location.origin + '/index.html',
-            },
-          });
-        } catch (e) {
-          if (window.M2M_DEBUG) window.M2M_DEBUG.log('OAUTH_ERROR', { message: e?.message || String(e) });
-          alert('Google sign-in failed: ' + (e?.message || e));
-        }
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: `${location.origin}/auth.html` }
+        });
+        if (data?.url) window.location.assign(data.url);
+        if (error) alert('Google sign-in failed: ' + (error.message || error));
       });
 
+      // 登出
       signOutBtn.addEventListener('click', async () => {
-        if (window.M2M_DEBUG) window.M2M_DEBUG.log('SIGN_OUT_CLICK');
-        // 强制确保点击后回到首页，即使无会话或网络异常
-        let redirected = false;
-        const doRedirect = () => {
-          if (redirected) return;
-          redirected = true;
-          try { window.location.replace('index.html'); } catch { window.location.href = 'index.html'; }
-        };
-        const fallback = setTimeout(doRedirect, 1500);
+        try { 
+          await supabase.auth.signOut();
+          // 清除手动管理的会话数据
+          localStorage.removeItem('supabase.auth.token');
+        } finally { 
+          await refreshUser(); 
+        }
+      });
 
+      // 从 URL 中提取会话信息
+      function extractSessionFromUrl() {
         try {
-          // 按钮反馈与防重复点击
-          signOutBtn.disabled = true;
-          signOutBtn.textContent = 'Signing out…';
-
-          // 尝试读取会话（不论是否存在都继续执行）
-          try { await supabase.auth.getSession(); } catch {}
-
-          // 触发登出（若无会话，该调用会快速返回）
-          try { await supabase.auth.signOut(); } catch {}
-
-          // 刷新用户显示
-          await refreshUser();
-        } finally {
-          clearTimeout(fallback);
-          signOutBtn.textContent = 'Sign out';
-          signOutBtn.disabled = false;
-          if (window.M2M_DEBUG) window.M2M_DEBUG.log('SIGN_OUT_DONE');
-          doRedirect();
+          const hash = window.location.hash;
+          const search = window.location.search;
+          const urlParams = new URLSearchParams(hash.substring(1) || search.substring(1));
+          
+          const accessToken = urlParams.get('access_token');
+          const refreshToken = urlParams.get('refresh_token');
+          const expiresIn = urlParams.get('expires_in');
+          
+          if (accessToken) {
+            // 解析 JWT token 获取用户信息
+            const payload = JSON.parse(atob(accessToken.split('.')[1]));
+            const user = {
+              id: payload.sub,
+              email: payload.email,
+              user_metadata: {
+                full_name: payload.user_metadata?.full_name || payload.name
+              }
+            };
+            
+            const expiresAt = expiresIn ? 
+              Math.floor(Date.now() / 1000) + parseInt(expiresIn) : 
+              payload.exp;
+            
+            return {
+              access_token: accessToken,
+              refresh_token: refreshToken,
+              expires_at: expiresAt,
+              user: user
+            };
+          }
+          return null;
+        } catch (error) {
+          console.error('Error extracting session from URL:', error);
+          return null;
         }
-      });
-
-      supabase.auth.onAuthStateChange(async (event, session) => {
-        if (window.M2M_DEBUG) window.M2M_DEBUG.log('AUTH_EVENT', { event, hasUser: !!session?.user, expires_at: session?.expires_at });
-        await refreshUser();
-        if (event === 'SIGNED_IN') {
-          window.location.href = 'index.html';
-        }
-      });
-      // Ensure session after redirect
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (window.M2M_DEBUG) window.M2M_DEBUG.log('GET_SESSION', { hasUser: !!data?.session?.user, expires_at: data?.session?.expires_at });
-      } catch (e) {
-        if (window.M2M_DEBUG) window.M2M_DEBUG.log('GET_SESSION_ERROR', { message: e?.message || String(e) });
       }
+
+      // 检查是否是登录回调
+      const hasAuthParams = window.location.hash.includes('access_token=') || 
+                           window.location.search.includes('access_token=');
+      
+      if (hasAuthParams) {
+        console.log('Detected auth callback, processing...');
+        // 从 URL 中提取会话信息
+        const sess = extractSessionFromUrl();
+        if (sess?.user) {
+          console.log('Login successful for:', sess.user.email);
+          who.textContent = `Signed in as ${sess.user.email}`;
+          
+          // 手动保存会话到 localStorage
+          try {
+            const sessionData = {
+              access_token: sess.access_token,
+              refresh_token: sess.refresh_token,
+              expires_at: sess.expires_at,
+              user: sess.user
+            };
+            
+            console.log('Saving session data:', {
+              user: sess.user.email,
+              expires_at: sess.expires_at,
+              expires_at_date: new Date(sess.expires_at * 1000)
+            });
+            
+            localStorage.setItem('supabase.auth.token', JSON.stringify(sessionData));
+            console.log('Session manually saved to localStorage');
+            
+            // 等待一下确保存储完成
+            await new Promise(r => setTimeout(r, 1000));
+            
+            // 验证存储
+            const stored = localStorage.getItem('supabase.auth.token');
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              console.log('Session storage verified:', {
+                user: parsed.user?.email,
+                expires_at: parsed.expires_at
+              });
+              console.log('Redirecting to index...');
+              window.location.replace('index.html');
+            } else {
+              console.log('Session storage verification failed');
+              who.textContent = 'Failed to save session - please try again';
+            }
+          } catch (error) {
+            console.error('Error saving session:', error);
+            who.textContent = 'Error saving session - please try again';
+          }
+        } else {
+          console.log('Login failed - could not extract session from URL');
+          who.textContent = 'Login failed - please try again';
+        }
+      } else {
+        // 不是登录回调，检查当前登录状态
+        const { data } = await supabase.auth.getSession();
+        if (data?.session?.user) {
+          who.textContent = `Signed in as ${data.session.user.email || data.session.user.id}`;
+        }
+      }
+
+      // 不监听 Supabase 的认证状态变化，我们手动管理
+      // supabase.auth.onAuthStateChange(async () => { await refreshUser(); });
+
+      // 初始刷新显示
       refreshUser();
     </script>
   </body>

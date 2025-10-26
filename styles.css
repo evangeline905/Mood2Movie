@@ -122,6 +122,15 @@ body {
 }
 .btn-primary:hover { filter: brightness(1.06); }
 .btn-primary .icon { width: 18px; height: 18px; }
+.btn-primary:disabled { 
+  opacity: 0.7; 
+  cursor: pointer; 
+}
+.btn-primary.generating {
+  background: linear-gradient(180deg, #ffd4b8, #ffb78e);
+  box-shadow: 0 5px 15px rgba(255, 147, 92, 0.25);
+  opacity: 0.8;
+}
 .btn-link { margin-left: 12px; background: transparent; border: none; color: #a06146; cursor: pointer; font-weight: 600; }
 .btn-link:hover { text-decoration: underline; }
 

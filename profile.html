@@ -58,7 +58,7 @@
           const hostOk = location.hostname === 'localhost';
           const portOk = location.port === '8000';
           if (!hostOk || !portOk) {
-            const target = `http://localhost:8000${location.pathname}${location.search}${location.hash}`;
+            //const target = `http://localhost:8000${location.pathname}${location.search}${location.hash}`;
             window.location.replace(target);
             return;
           }
@@ -74,14 +74,14 @@
           const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.6/+esm');
           const SUPABASE_URL = 'https://emnvezsluaulmnoitrle.supabase.co';
           const SUPABASE_ANON_KEY = 'sb_publishable_8MCFTES3t64IIOhQScgy5A_bcaaWYdL';
-          supabase = (window.supabaseClient ||= createClient(location.origin + '/supabase', SUPABASE_ANON_KEY, {
+          supabase = (window.supabaseClient ||= createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: {
-              persistSession: true,
-              autoRefreshToken: true,
-              detectSessionInUrl: true,
+              persistSession: false,
+              autoRefreshToken: false,
+              detectSessionInUrl: false
             },
           }));
-          if (window.M2M_DEBUG) window.M2M_DEBUG.log('SUPABASE_INIT', { SUPABASE_URL: location.origin + '/supabase' });
+          if (window.M2M_DEBUG) window.M2M_DEBUG.log('SUPABASE_INIT', { SUPABASE_URL });
         }
         // 确保会话初始化
         try {
@@ -90,13 +90,38 @@
         } catch (e) {
           if (window.M2M_DEBUG) window.M2M_DEBUG.log('GET_SESSION_ERROR', { message: e?.message || String(e) });
         }
-        // 未登录时直接回到主页，避免误入 My Movies
-        try {
-          const { data } = await supabase.auth.getSession();
-          if (!data?.session?.user) {
+        // 检查手动存储的会话
+        (function checkSession() {
+          try {
+            const storedSession = localStorage.getItem('supabase.auth.token');
+            if (!storedSession) {
+              console.log('No stored session found, redirecting to index');
+              window.location.href = 'index.html';
+              return;
+            }
+            
+            const sessionData = JSON.parse(storedSession);
+            if (!sessionData.user) {
+              console.log('Invalid stored session, redirecting to index');
+              window.location.href = 'index.html';
+              return;
+            }
+            
+            // 检查会话是否过期
+            if (sessionData.expires_at && new Date(sessionData.expires_at * 1000) <= new Date()) {
+              console.log('Stored session expired, redirecting to index');
+              localStorage.removeItem('supabase.auth.token');
+              window.location.href = 'index.html';
+              return;
+            }
+            
+            console.log('Valid stored session found for:', sessionData.user.email);
+          } catch (error) {
+            console.error('Error checking stored session:', error);
             window.location.href = 'index.html';
+            return;
           }
-        } catch {}
+        })();
       } catch (e) {
         console.warn('Supabase import failed, running in local-only mode', e);
       }
@@ -111,11 +136,18 @@
       const headerBadge = document.getElementById('user-badge');
       async function updateHeaderBadge() {
         try {
-          const { data } = await supabase.auth.getSession();
-          const user = data?.session?.user || null;
+          const storedSession = localStorage.getItem('supabase.auth.token');
+          if (!storedSession) {
+            if (headerBadge) headerBadge.textContent = 'Not signed in';
+            return;
+          }
+          
+          const sessionData = JSON.parse(storedSession);
+          const user = sessionData.user;
           const displayName = user ? (user.user_metadata?.full_name || user.email || user.id) : null;
           if (headerBadge) headerBadge.textContent = displayName || 'Not signed in';
-        } catch {
+        } catch (error) {
+          console.error('Error updating header badge:', error);
           if (headerBadge) headerBadge.textContent = 'Not signed in';
         }
       }
@@ -154,27 +186,67 @@
         const s = loadStates();
         return Object.entries(s)
           .filter(([_, v]) => v === 'wish' || (v && typeof v === 'object' && v.favorite))
-          .map(([title]) => ({ title }));
+          .map(([title, v]) => {
+            if (v && typeof v === 'object' && v.favorite) {
+              return {
+                title: v.title || title,
+                year: v.year,
+                poster_url: v.poster_url,
+                genres: v.genres,
+                rating: v.rating,
+                runtime: v.runtime,
+                country: v.country
+              };
+            }
+            return { title };
+          });
       }
       function getLocalWatched() {
         const s = loadStates();
-        return Object.entries(s)
-          .filter(([_, v]) => v === 'seen' || (v && typeof v === 'object' && v.watched))
-          .map(([title]) => ({ title }));
+        console.log('getLocalWatched - raw states:', s);
+        const entries = Object.entries(s);
+        console.log('getLocalWatched - entries:', entries);
+        const filtered = entries.filter(([_, v]) => v === 'seen' || (v && typeof v === 'object' && v.watched));
+        console.log('getLocalWatched - filtered:', filtered);
+        const result = filtered.map(([title, v]) => {
+          if (v && typeof v === 'object' && v.watched) {
+            return {
+              title: v.title || title,
+              year: v.year,
+              poster_url: v.poster_url,
+              genres: v.genres,
+              rating: v.rating,
+              runtime: v.runtime,
+              country: v.country
+            };
+          }
+          return { title };
+        });
+        console.log('getLocalWatched - result:', result);
+        return result;
       }
 
       async function getUser() {
         try {
-          const { data } = await supabase.auth.getSession();
-          const user = data?.session?.user || null;
-          const displayName = user ? (user.user_metadata?.full_name || user.email || user.id) : null;
-          if (displayName) {
+          const storedSession = localStorage.getItem('supabase.auth.token');
+          if (!storedSession) {
+            whoEl.textContent = 'Not signed in. Cloud favourites require sign-in.';
+            return null;
+          }
+          
+          const sessionData = JSON.parse(storedSession);
+          const user = sessionData.user;
+          
+          if (user) {
+            const displayName = user.user_metadata?.full_name || user.email || user.id;
             whoEl.textContent = displayName;
             return user;
           }
+          
           whoEl.textContent = 'Not signed in. Cloud favourites require sign-in.';
           return null;
-        } catch {
+        } catch (error) {
+          console.error('Error getting user from stored session:', error);
           whoEl.textContent = 'Not signed in.';
           return null;
         }
@@ -182,22 +254,42 @@
 
       async function fetchCloudMarks(mark) {
         try {
-          const { data } = await supabase.auth.getSession();
-          const uid = data?.session?.user?.id;
-          if (!uid) return [];
+          const storedSession = localStorage.getItem('supabase.auth.token');
+          if (!storedSession) {
+            console.log('fetchCloudMarks: No stored session');
+            return [];
+          }
+          
+          const sessionData = JSON.parse(storedSession);
+          const uid = sessionData.user?.id;
+          if (!uid) {
+            console.log('fetchCloudMarks: No user ID');
+            return [];
+          }
+          
+          console.log('fetchCloudMarks: Fetching', mark, 'for user', uid);
           const { data: marks, error: mErr } = await supabase
             .from('user_movie_marks')
             .select('movie_id')
             .eq('user_id', uid)
             .eq('mark', mark);
           if (mErr) throw mErr;
+          
+          console.log('fetchCloudMarks: Found marks', marks);
           const ids = (marks || []).map(m => m.movie_id).filter(Boolean);
-          if (!ids.length) return [];
+          if (!ids.length) {
+            console.log('fetchCloudMarks: No movie IDs found');
+            return [];
+          }
+          
+          console.log('fetchCloudMarks: Fetching movies with IDs', ids);
           const { data: movies, error: vErr } = await supabase
             .from('movies')
             .select('id,title,year,poster_url')
             .in('id', ids);
           if (vErr) throw vErr;
+          
+          console.log('fetchCloudMarks: Found movies', movies);
           return movies || [];
         } catch (e) {
           console.warn('fetchCloudMarks failed:', e?.message || e);
@@ -214,22 +306,136 @@
         return Array.from(map.values());
       }
 
-      function posterOf(it) {
-        return it.poster_url || `https://picsum.photos/seed/${encodeURIComponent(it.title || 'movie')}/300/450`;
+      // 海报缓存
+      const _posterCache = new Map();
+      
+      // TMDB条款要求：缓存不超过6个月
+      const TMDB_CACHE_DURATION = 6 * 30 * 24 * 60 * 60 * 1000; // 6个月（毫秒）
+      
+      function isCacheExpired(timestamp) {
+        return Date.now() - timestamp > TMDB_CACHE_DURATION;
+      }
+      
+      // 清理过期的海报缓存
+      function cleanExpiredPosterCache() {
+        const now = Date.now();
+        for (const [key, data] of _posterCache.entries()) {
+          if (data.timestamp && isCacheExpired(data.timestamp)) {
+            _posterCache.delete(key);
+          }
+        }
+      }
+      
+      // 定期清理过期缓存（每小时检查一次）
+      setInterval(cleanExpiredPosterCache, 60 * 60 * 1000);
+      
+      // 从 script.js 复制的海报获取函数
+      async function getTmdbPoster(title, year) {
+        try {
+          const response = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=1b3388b11b1c8627ffe1e6901a889c4f&query=${encodeURIComponent(title)}&year=${year || ''}`);
+          const data = await response.json();
+          if (data.results && data.results.length > 0) {
+            const posterPath = data.results[0].poster_path;
+            return posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
+          }
+        } catch (error) {
+          console.warn('TMDB API error:', error);
+        }
+        return null;
+      }
+      
+      async function getOmdbPoster(title, year) {
+        try {
+          const response = await fetch(`https://www.omdbapi.com/?apikey=trilogy&t=${encodeURIComponent(title)}&y=${year || ''}`);
+          const data = await response.json();
+          return data.Poster && data.Poster !== 'N/A' ? data.Poster : null;
+        } catch (error) {
+          console.warn('OMDb API error:', error);
+        }
+        return null;
+      }
+      
+      async function getPosterUrl(title, year, candidate) {
+        const key = `poster-${title}-${year ?? ''}`;
+        
+        // 检查缓存是否存在且未过期
+        if (_posterCache.has(key)) {
+          const cachedData = _posterCache.get(key);
+          if (cachedData.timestamp && !isCacheExpired(cachedData.timestamp)) {
+            return cachedData.url;
+          } else {
+            // 缓存过期，删除旧缓存
+            _posterCache.delete(key);
+          }
+        }
+        
+        // 1) Try TMDB
+        let poster = await getTmdbPoster(title, year);
+        
+        // 若 TMDB 未找到且提供了候选链接，需校验候选是否为有效 URL
+        const isValidUrl = (u) => {
+          const s = String(u || '').trim();
+          return /^(https?:|data:|blob:)/i.test(s);
+        };
+        if (!poster && candidate && isValidUrl(candidate)) poster = candidate.trim();
+        
+        // 2) Fallback OMDb
+        if (!poster) poster = await getOmdbPoster(title, year);
+        
+        // 3) Final fallback
+        if (!poster) poster = `https://picsum.photos/seed/${encodeURIComponent(title)}/300/450`;
+        
+        // 存储到缓存，包含时间戳
+        _posterCache.set(key, {
+          url: poster,
+          timestamp: Date.now()
+        });
+        
+        return poster;
       }
 
-      function renderGrid(items, gridEl, countEl, emptyEl) {
+      async function posterOf(it) {
+        // 如果有存储的海报URL，优先使用
+        if (it.poster_url) {
+          return it.poster_url;
+        }
+        
+        // 否则使用与主页相同的海报获取逻辑
+        try {
+          const poster = await getPosterUrl(it.title, it.year, it.posterUrl);
+          return poster;
+        } catch (error) {
+          console.warn('Failed to get poster for', it.title, error);
+          return `https://picsum.photos/seed/${encodeURIComponent(it.title || 'movie')}/300/450`;
+        }
+      }
+
+      async function renderGrid(items, gridEl, countEl, emptyEl) {
         gridEl.innerHTML = '';
         const list = items || [];
         countEl.textContent = list.length ? `Total ${list.length}` : '';
         emptyEl.hidden = !!list.length;
         if (!list.length) return;
-        for (const it of list) {
+        
+        // 并行获取所有海报URL，即使某些失败也不影响其他
+        const posterPromises = list.map(it => posterOf(it));
+        const posterResults = await Promise.allSettled(posterPromises);
+        
+        for (let i = 0; i < list.length; i++) {
+          const it = list[i];
+          const posterResult = posterResults[i];
+          
           const card = document.createElement('div');
           card.className = 'movie-card';
+          
+          // 获取海报URL，如果失败则使用默认图片
+          const posterUrl = posterResult.status === 'fulfilled' 
+            ? posterResult.value 
+            : `https://picsum.photos/seed/${encodeURIComponent(it.title || 'movie')}/300/450`;
+          
           card.innerHTML = `
             <div class="accent-bar"></div>
-            <div class="poster"><img alt="${(it.title || '').replace(/["<>]/g,'')}" src="${posterOf(it)}" loading="lazy"></div>
+            <div class="poster"><img alt="${(it.title || '').replace(/["<>]/g,'')}" src="${posterUrl}" loading="lazy"></div>
             <div class="info">
               <div class="title-row">
                 <span class="name">${(it.title || '').replace(/["<>]/g,'')}</span>
@@ -250,8 +456,11 @@
 
       async function removeCloudMarkByTitleYear(mark, title, year, movieIdOpt) {
         try {
-          const { data } = await supabase.auth.getSession();
-          const uid = data?.session?.user?.id;
+          const storedSession = localStorage.getItem('supabase.auth.token');
+          if (!storedSession) return;
+          
+          const sessionData = JSON.parse(storedSession);
+          const uid = sessionData.user?.id;
           if (!uid) return;
           let movieId = movieIdOpt;
           if (!movieId) {
@@ -278,15 +487,43 @@
 
       async function refreshAll() {
         const user = await getUser();
-        // 未登录：严格显示为空，不混入本地收藏/已看
+        
         if (!user) {
-          renderGrid([], favGrid, favCount, favEmpty);
-          renderGrid([], watchedGrid, watchedCount, watchedEmpty);
+          // 未登录：显示本地数据
+          const localFav = getLocalFavourites();
+          const localWatched = getLocalWatched();
+          console.log('Not logged in, showing local data:', { localFav, localWatched });
+          await renderGrid(localFav, favGrid, favCount, favEmpty);
+          await renderGrid(localWatched, watchedGrid, watchedCount, watchedEmpty);
           return;
         }
-        // 已登录：仅显示云端数据
+        
+        // 已登录：获取云端数据并与本地数据合并
+        console.log('Logged in, fetching cloud data...');
         const cloudFav = await fetchCloudMarks('favorite');
-        renderGrid(dedupeByTitleYear(cloudFav || []), favGrid, favCount, favEmpty);
+        const cloudWatched = await fetchCloudMarks('watched');
+        
+        // 获取本地收藏和已看电影
+        const localFav = getLocalFavourites();
+        const localWatched = getLocalWatched();
+        
+        console.log('Cloud data - Favorites:', cloudFav?.length || 0, cloudFav);
+        console.log('Cloud data - Watched:', cloudWatched?.length || 0, cloudWatched);
+        console.log('Local data - Favorites:', localFav?.length || 0, localFav);
+        console.log('Local data - Watched:', localWatched?.length || 0, localWatched);
+        
+        // 合并本地和云端数据
+        const allFav = [...(cloudFav || []), ...localFav];
+        const allWatched = [...(cloudWatched || []), ...localWatched];
+        
+        // 去重
+        const uniqueFav = dedupeByTitleYear(allFav);
+        const uniqueWatched = dedupeByTitleYear(allWatched);
+        
+        console.log('Merged data - Favorites:', uniqueFav?.length || 0, uniqueFav);
+        console.log('Merged data - Watched:', uniqueWatched?.length || 0, uniqueWatched);
+        
+        await renderGrid(uniqueFav, favGrid, favCount, favEmpty);
         // 安装移除按钮事件（取消收藏）
         favGrid.querySelectorAll('.movie-card').forEach((card) => {
           const btn = card.querySelector('.remove-btn');
@@ -299,8 +536,7 @@
           });
         });
 
-        const cloudWatched = await fetchCloudMarks('watched');
-        renderGrid(dedupeByTitleYear(cloudWatched || []), watchedGrid, watchedCount, watchedEmpty);
+        await renderGrid(uniqueWatched, watchedGrid, watchedCount, watchedEmpty);
         // 安装移除按钮事件（取消已看）
         watchedGrid.querySelectorAll('.movie-card').forEach((card) => {
           const btn = card.querySelector('.remove-btn');
@@ -320,27 +556,26 @@
         if (e.key === 'm2m_states') refreshAll();
       });
 
-      // 登录状态变化刷新（若 Supabase 可用）
-      if (supabase && supabase.auth) {
-        supabase.auth.onAuthStateChange(async (event, sess) => {
-          if (window.M2M_DEBUG) window.M2M_DEBUG.log('AUTH_EVENT', { event, hasUser: !!sess?.user, expires_at: sess?.expires_at });
-          await refreshAll();
-          await updateHeaderBadge();
-          // 根据当前用户订阅 Realtime（如果表启用）
-          try {
-            const uid = sess?.user?.id;
-            if (uid) {
-              realtime?.unsubscribe?.();
-              realtime = supabase
-                .channel('user_movie_marks_' + uid)
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'user_movie_marks', filter: `user_id=eq.${uid}` }, () => refreshAll())
-                .subscribe();
-            }
-          } catch {}
-        });
-      }
+      // 禁用 Supabase 的认证状态监听器，我们手动管理会话
+      // if (supabase && supabase.auth) {
+      //   supabase.auth.onAuthStateChange(async (event, sess) => {
+      //     if (window.M2M_DEBUG) window.M2M_DEBUG.log('AUTH_EVENT', { event, hasUser: !!sess?.user, expires_at: sess?.expires_at });
+      //     await refreshAll();
+      //     await updateHeaderBadge();
+      //     // 根据当前用户订阅 Realtime（如果表启用）
+      //     try {
+      //       const uid = sess?.user?.id;
+      //       if (uid) {
+      //         realtime?.unsubscribe?.();
+      //         realtime = supabase
+      //           .channel('user_movie_marks_' + uid)
+      //           .on('postgres_changes', { event: '*', schema: 'public', table: 'user_movie_marks', filter: `user_id=eq.${uid}` }, () => refreshAll())
+      //           .subscribe();
+      //       }
+      //     } catch {}
+      //   });
+      // }
       let realtime = null;
-      try { await supabase.auth.getSession(); } catch {}
       await updateHeaderBadge();
       refreshAll();
     </script>

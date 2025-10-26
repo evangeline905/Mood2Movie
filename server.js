@@ -35,6 +35,11 @@ const server = http.createServer(app);
 server.on('upgrade', supabaseProxy.upgrade);
 
 const PORT = process.env.PORT || 8000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', (error) => {
+  if (error) {
+    console.error('Error starting server:', error);
+    return;
+  }
   console.log(`Reverse proxy + static server on http://localhost:${PORT}`);
+  console.log(`Server is also accessible at http://0.0.0.0:${PORT}`);
 });

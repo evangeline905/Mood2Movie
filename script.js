@@ -77,10 +77,15 @@ let hadAuthSession = false;
 const supabase = typeof window !== 'undefined' ? window.supabaseClient : null;
 async function getSupabaseUserId() {
   try {
-    if (!supabase) return null;
-    const { data } = await supabase.auth.getSession();
-    return data?.session?.user?.id || null;
-  } catch { return null; }
+    const storedSession = localStorage.getItem('supabase.auth.token');
+    if (!storedSession) return null;
+    
+    const sessionData = JSON.parse(storedSession);
+    return sessionData.user?.id || null;
+  } catch (error) {
+    console.error('Error getting user ID from stored session:', error);
+    return null;
+  }
 }
 async function upsertMovieToCloud(item, poster) {
   try {
@@ -106,18 +111,28 @@ async function upsertMovieToCloud(item, poster) {
 }
 async function setFavoriteMarkInCloud(item, poster) {
   try {
-    if (!supabase) return false;
+    if (!supabase) {
+      console.log('setFavoriteMarkInCloud: No supabase client');
+      return false;
+    }
     const uid = await getSupabaseUserId();
     if (!uid) {
+      console.log('setFavoriteMarkInCloud: No user ID');
       showToast('Sign in to sync favourites to cloud');
       return false;
     }
+    console.log('setFavoriteMarkInCloud: Saving favorite for user', uid, 'movie:', item.title);
     const movieId = await upsertMovieToCloud(item, poster);
-    if (!movieId) return false;
+    if (!movieId) {
+      console.log('setFavoriteMarkInCloud: Failed to get movie ID');
+      return false;
+    }
+    console.log('setFavoriteMarkInCloud: Got movie ID', movieId, 'for', item.title);
     const { error } = await supabase
       .from('user_movie_marks')
       .upsert({ user_id: uid, movie_id: movieId, mark: 'favorite' }, { onConflict: 'user_id,movie_id,mark' });
     if (error) throw error;
+    console.log('setFavoriteMarkInCloud: Successfully saved favorite for', item.title);
     return true;
   } catch (e) {
     console.warn('setFavoriteMarkInCloud failed:', e?.message || e);
@@ -133,12 +148,14 @@ async function setWatchedMarkInCloud(item, poster) {
       showToast('Sign in to sync watched to cloud');
       return false;
     }
+    console.log('Saving watched movie to cloud:', { title: item.title, uid });
     const movieId = await upsertMovieToCloud(item, poster);
     if (!movieId) return false;
     const { error } = await supabase
       .from('user_movie_marks')
       .upsert({ user_id: uid, movie_id: movieId, mark: 'watched' }, { onConflict: 'user_id,movie_id,mark' });
     if (error) throw error;
+    console.log('Successfully saved watched movie to cloud:', { title: item.title, movieId });
     return true;
   } catch (e) {
     console.warn('setWatchedMarkInCloud failed:', e?.message || e);
@@ -150,8 +167,7 @@ async function setWatchedMarkInCloud(item, poster) {
 async function removeCloudMarkByTitleYear(mark, title, year, id) {
   try {
     if (!supabase) return;
-    const { data } = await supabase.auth.getSession();
-    const uid = data?.session?.user?.id;
+    const uid = await getSupabaseUserId();
     if (!uid) return;
     let movieId = id;
     if (!movieId) {
@@ -239,80 +255,80 @@ function updateAuthNav(user) {
   } catch {}
 }
 
-// 监听登录状态变化：登录后刷新收藏映射到页面
-if (supabase && supabase.auth) {
-  try {
-    let signedOutTimer = null;
-    function logAuthEvent(evt, sess) {
-      try {
-        const uid = sess?.user?.id || null;
-        const item = { evt, uid, when: new Date().toISOString() };
-        const list = JSON.parse(localStorage.getItem('m2m_auth_events') || '[]');
-        list.push(item);
-        if (list.length > 50) list.splice(0, list.length - 50);
-        localStorage.setItem('m2m_auth_events', JSON.stringify(list));
-      } catch {}
-    }
-    supabase.auth.onAuthStateChange(async (event, sess) => {
-      // 记录是否曾出现有效会话
-      try { hadAuthSession = hadAuthSession || !!(sess && sess.user); } catch {}
-      // 记录日志
-      try { logAuthEvent(event, sess); } catch {}
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        await updateUserBadge();
-        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-          try {
-            const favs = await fetchCloudFavorites();
-            const titles = new Set(favs.map((f) => f.title));
-            document.querySelectorAll('.ticket-page').forEach((pg) => {
-              const name = pg.querySelector('.ticket-title')?.textContent?.trim();
-              if (name && titles.has(name)) {
-                setMark(name, 'favorite', true);
-                pg.querySelector('.wish-btn')?.classList.add('active');
-              }
-            });
-          } catch {}
-        }
-      } else if (event === 'SIGNED_OUT') {
-        // 去抖处理，避免导航或初始化期间的误报
-        try { if (signedOutTimer) clearTimeout(signedOutTimer); } catch {}
-        if (hadAuthSession) {
-          signedOutTimer = setTimeout(async () => {
-            try {
-              const { data } = await supabase.auth.getSession();
-              if (data?.session?.user) {
-                await updateUserBadge();
-              } else {
-                showToast('Signed out');
-                await updateUserBadge();
-              }
-            } catch {
-              showToast('Signed out');
-              await updateUserBadge();
-            }
-          }, 500);
-        }
-      }
-    });
-    // Ensure session restored then update badge
-    try {
-      const { data } = await supabase.auth.getSession();
-      if (data?.session?.user) hadAuthSession = true;
-    } catch {}
-    updateUserBadge();
-  } catch {}
-}
+// 禁用 Supabase 的认证状态监听器，我们手动管理会话
+// if (supabase && supabase.auth) {
+//   try {
+//     let signedOutTimer = null;
+//     function logAuthEvent(evt, sess) {
+//       try {
+//         const uid = sess?.user?.id || null;
+//         const item = { evt, uid, when: new Date().toISOString() };
+//         const list = JSON.parse(localStorage.getItem('m2m_auth_events') || '[]');
+//         list.push(item);
+//         if (list.length > 50) list.splice(0, list.length - 50);
+//         localStorage.setItem('m2m_auth_events', JSON.stringify(list));
+//       } catch {}
+//     }
+//     supabase.auth.onAuthStateChange(async (event, sess) => {
+//       // 记录是否曾出现有效会话
+//       try { hadAuthSession = hadAuthSession || !!(sess && sess.user); } catch {}
+//       // 记录日志
+//       try { logAuthEvent(event, sess); } catch {}
+//       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+//         await updateUserBadge();
+//         if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+//           try {
+//             const favs = await fetchCloudFavorites();
+//             const titles = new Set(favs.map((f) => f.title));
+//             document.querySelectorAll('.ticket-page').forEach((pg) => {
+//               const name = pg.querySelector('.ticket-title')?.textContent?.trim();
+//               if (name && titles.has(name)) {
+//                 setMark(name, 'favorite', true);
+//                 pg.querySelector('.wish-btn')?.classList.add('active');
+//               }
+//             });
+//           } catch {}
+//         }
+//       } else if (event === 'SIGNED_OUT') {
+//         // 去抖处理，避免导航或初始化期间的误报
+//         try { if (signedOutTimer) clearTimeout(signedOutTimer); } catch {}
+//         if (hadAuthSession) {
+//           signedOutTimer = setTimeout(async () => {
+//             try {
+//               const { data } = await supabase.auth.getSession();
+//               if (data?.session?.user) {
+//                 await updateUserBadge();
+//               } else {
+//                 showToast('Signed out');
+//                 await updateUserBadge();
+//               }
+//             } catch {
+//               showToast('Signed out');
+//               await updateUserBadge();
+//             }
+//           }, 500);
+//         }
+//       }
+//     });
+//     // Ensure session restored then update badge
+//     try {
+//       const { data } = await supabase.auth.getSession();
+//       if (data?.session?.user) hadAuthSession = true;
+//     } catch {}
+//     updateUserBadge();
+//   } catch {}
+// }
 
 // TMDB credentials (can be overridden via window.TMDB_READ_TOKEN / window.TMDB_API_KEY)
-const TMDB_READ_TOKEN = window.TMDB_READ_TOKEN || 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJkNTkzNjViZjQ3NjE4NWNlNTM1ZGI1OTEyMmM3ODk5YiIsIm5iZiI6MTc2MDIwODY4My40NTIsInN1YiI6IjY4ZWFhNzJiOGY3OTNkZTRlNzFmNjczMiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.Emmwt6G3TfYyyFLbpAL-DyRqUoEVPXaaQAssiY9jfz0';
-const TMDB_API_KEY = window.TMDB_API_KEY || 'd59365bf476185ce535db59122c7899b';
+// 注意：在生产环境中，这些密钥应该通过环境变量或服务器端API提供
+const TMDB_READ_TOKEN = window.TMDB_READ_TOKEN || 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxYjMzODhiMTFiMWM4NjI3ZmZlMWU2OTAxYTg4OWM0ZiIsIm5iZiI6MTc2MDIwODY4My40NTIsInN1YiI6IjY4ZWFhNzJiOGY3OTNkZTRlNzFmNjczMiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.ijIF_j2ZesTQNkmgfzogTL0y1DBLUFQ-CfVBSErxPZQ';
+const TMDB_API_KEY = window.TMDB_API_KEY || '1b3388b11b1c8627ffe1e6901a889c4f';
 
 chips.addEventListener('click', (e) => {
   const t = e.target;
   if (t.classList.contains('chip')) {
     const text = t.textContent.trim();
-    const current = textarea.value.trim();
-    textarea.value = current ? `${current}\n${text}` : text;
+    textarea.value = text; // 直接替换，而不是追加
     textarea.focus();
   }
 });
@@ -331,8 +347,15 @@ stopBtn?.addEventListener('click', () => {
   stopGenQuotes();
 });
 
-// Restore last items on page load
-try { restoreLastItems(); } catch {}
+// Restore last items on page load - use DOMContentLoaded to ensure DOM is ready
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    console.log('DOM loaded, attempting to restore items...');
+    await restoreLastItems();
+  } catch (error) {
+    console.error('Failed to restore items on DOM load:', error);
+  }
+});
 
 async function startRecommendation(reroll = false) {
   const content = textarea.value.trim();
@@ -340,13 +363,25 @@ async function startRecommendation(reroll = false) {
     showToast('请先描述你想看的电影，再开始推荐～');
     return;
   }
+  
+  // 保存用户输入，以便Refresh Batch使用
+  localStorage.setItem('m2m_last_input', content);
 
   resultsCard.hidden = false;
   setStatus('Checking availability…');
+  
+  // 禁用Generate按钮，显示生成中状态
+  goBtn.disabled = true;
+  goBtn.textContent = 'Generating...';
+  goBtn.classList.add('generating');
 
   if (!('LanguageModel' in globalThis)) {
     setStatus('API unavailable');
     showToast('Prompt API is disabled. Please enable it in Chrome 138+ (flags).');
+    // 恢复Generate按钮状态
+    goBtn.disabled = false;
+    goBtn.textContent = 'Generate';
+    goBtn.classList.remove('generating');
     return;
   }
 
@@ -354,6 +389,10 @@ async function startRecommendation(reroll = false) {
   setStatus(`Status: ${availability}`);
   if (availability === 'unavailable') {
     showToast('Device or environment does not meet the requirements (disk/memory/GPU).');
+    // 恢复Generate按钮状态
+    goBtn.disabled = false;
+    goBtn.textContent = 'Generate';
+    goBtn.classList.remove('generating');
     return;
   }
 
@@ -374,12 +413,21 @@ async function startRecommendation(reroll = false) {
   const region = (window.USER_REGION || '');
   const prevTitlesArr = Array.isArray(window.lastTitles) ? window.lastTitles : [];
   const prevTitles = prevTitlesArr.length ? prevTitlesArr.join(', ') : '';
+  
+  // 获取用户已观看的电影标题，避免重复推荐
+  const watchedTitles = getWatchedTitles();
+  const watchedTitlesStr = watchedTitles.length ? watchedTitles.join(', ') : '';
+  
+         // 如果用户已经观看了某些电影，在prompt中明确禁止推荐
+         const exclusionRule = watchedTitlesStr ? 
+           `\n\n🚫 ABSOLUTELY FORBIDDEN - DO NOT RECOMMEND ANY OF THESE MOVIES:\n${watchedTitlesStr}\n\nMANDATORY RULE: If you see any movie title that matches or is similar to the above list, DO NOT include it in your recommendations. This is a hard requirement that cannot be violated.` : '';
   try {
     session = await LanguageModel.create({
       signal: controller.signal,
+      language: 'en', // 指定输出语言为英语
       initialPrompts: [{
         role: 'system',
-        content: `You are Mood2Movie, a professional AI movie curator. Based on the user's mood, preferences, and region, recommend suitable movies.\n\nRequirements:\n1. Output MUST be strict JSON and follow the schema exactly.\n2. Each recommendation is a "movie ticket" with title, short reason, watchability, rating, etc.\n3. Keep the reason short, warm, and spoiler-free.\n4. Do NOT add explanations or extra text; the JSON is the final output.\n5. Output language: English.\n6. If the user mentions titles or genres, prioritize semantically related films.\n7. Recommend 5 movies each time.\n8. If user requests a reroll, avoid repeating titles from the previous batch.\n\nOutput format (strict JSON):\n{\n  "recommendations": [\n    {\n      "title": "string(movie title)",\n      "year": "number(release year)",\n      "reason": "string(≤ 40 words)",\n      "genres": ["string"],\n      "rating": "number(0~10)",\n      "runtime": "string(e.g., '102 min')",\n      "country": "string",\n      "availability": "string(e.g., 'Available on Netflix' or 'Disney+')",\n      "poster": "string(poster URL)",\n      "match_score": "number(0~100)",\n      "user_mood": "string(user mood)",\n      "recommendation_id": "string(e.g., 'M2M-{{date}}-001')",\n      "theme_color": "string(e.g., '#EAE0C8')"\n    }\n  ]\n}\n\nContext:\nUser mood: ${mood}\nPreferred language: ${lang}\nLiked titles: ${liked_titles}\nExclude titles: ${excludes}\nProviders: ${providers}\nRegion: ${region}${prevTitles ? `\nPrevious batch titles (avoid duplicates): ${prevTitles}` : ''}\n\nReturn ONLY the JSON that follows the schema above; no extra text.`,
+         content: `You are Mood2Movie, a professional AI movie curator. Based on the user's mood, preferences, and region, recommend suitable movies.\n\n**MOST IMPORTANT RULE**: NEVER recommend any movie that the user has already watched. This is the #1 priority.\n\nRequirements:\n1. Output MUST be strict JSON and follow the schema exactly.\n2. Each recommendation is a "movie ticket" with title, short reason, watchability, rating, etc.\n3. Keep the reason short, warm, and spoiler-free.\n4. Do NOT add explanations or extra text; the JSON is the final output.\n5. Output language: English.\n6. If the user mentions titles or genres, prioritize semantically related films.\n7. Recommend 3 movies each time.\n8. If user requests a reroll, avoid repeating titles from the previous batch.\n9. **CRITICAL**: NEVER recommend movies that the user has already watched. Check the "Already watched movies" list carefully.\n\nOutput format (strict JSON):\n{\n  "recommendations": [\n    {\n      "title": "string(movie title)",\n      "year": "number(release year)",\n      "reason": "string(≤ 40 words)",\n      "genres": ["string"],\n      "rating": "number(0~10)",\n      "runtime": "string(e.g., '102 min')",\n      "country": "string",\n      "availability": "string(e.g., 'Available on Netflix' or 'Disney+')",\n      "poster": "string(poster URL)",\n      "match_score": "number(0~100)",\n      "user_mood": "string(user mood)",\n      "recommendation_id": "string(e.g., 'M2M-{{date}}-001')",\n      "theme_color": "string(e.g., '#EAE0C8')"\n    }\n  ]\n}\n\nContext:\nUser mood: ${mood}\nPreferred language: ${lang}\nLiked titles: ${liked_titles}\nExclude titles: ${excludes}${exclusionRule}\nProviders: ${providers}\nRegion: ${region}${prevTitles ? `\nPrevious batch titles (avoid duplicates): ${prevTitles}` : ''}\n\n**FINAL REMINDER**: Before outputting any movie title, double-check that it is NOT in the forbidden list above. If you see any similarity, choose a different movie instead.\n\nReturn ONLY the JSON that follows the schema above; no extra text.`,
       }],
       monitor(m) {
         downloadEl.hidden = false;
@@ -448,31 +496,61 @@ async function startRecommendation(reroll = false) {
       parsed = parseJsonRecommendations(finalText) || parseRecommendations(finalText);
       items = Array.isArray(parsed?.recommendations) ? parsed.recommendations : parsed;
     }
-    const limited = (items || []).slice(0, 3);
-    renderCards(limited);
-    try { saveLastItems(limited); } catch {}
-    window.lastTitles = limited.map(it => it.title).filter(Boolean);
-    countEl.textContent = limited.length ? `Total ${limited.length}` : '';
+    const limited = (items || []).slice(0, 3); // 获取3部电影
+    
+    // 过滤掉已观看的电影
+    const watchedTitles = getWatchedTitles();
+    const filtered = limited.filter(item => {
+      const title = item.title || '';
+      const isWatched = watchedTitles.some(watchedTitle => {
+        // 检查标题是否匹配或相似
+        return title.toLowerCase().includes(watchedTitle.toLowerCase()) || 
+               watchedTitle.toLowerCase().includes(title.toLowerCase());
+      });
+      if (isWatched) {
+        // 过滤掉已观看的电影
+      }
+      return !isWatched;
+    });
+    
+    // 直接显示过滤后的电影（如果不足3部就显示可用的）
+    renderCards(filtered);
+    try { saveLastItems(filtered); } catch {}
+    window.lastTitles = filtered.map(it => it.title).filter(Boolean);
+    countEl.textContent = filtered.length ? `Total ${filtered.length}` : '';
     // 若无法解析为卡片，则直接展示文本内容
-    resultEl.hidden = !!limited.length;
-    if (!limited.length) {
-      resultEl.textContent = finalText;
+    resultEl.hidden = !!filtered.length;
+    if (!filtered.length) {
+      resultEl.textContent = finalText || 'No recommendations found.';
     }
     setStatus('Done');
     stopGenQuotes();
+    // 恢复Generate按钮状态
+    goBtn.disabled = false;
+    goBtn.textContent = 'Generate';
+    goBtn.classList.remove('generating');
   } catch (err) {
     console.error(err);
     setStatus('Error');
     stopGenQuotes();
     showToast('Generation failed: ' + err.message);
+    // 恢复Generate按钮状态
+    goBtn.disabled = false;
+    goBtn.textContent = 'Generate';
+    goBtn.classList.remove('generating');
   }
 }
 
 function refreshRecommendations() {
   const content = textarea.value.trim();
   if (!content) {
-    showToast('Please generate a batch first, then refresh.');
-    return;
+    // 如果没有输入内容，尝试使用上次的输入或默认描述
+    const lastInput = localStorage.getItem('m2m_last_input') || 'I want to watch a good movie';
+    textarea.value = lastInput;
+    showToast('Using previous input to generate new batch...');
+  } else {
+    // 保存当前输入，以便下次使用
+    localStorage.setItem('m2m_last_input', content);
   }
   setStatus('Refreshing batch…');
   startRecommendation(true);
@@ -499,14 +577,23 @@ function saveLastItems(items) {
 function loadLastItems() {
   try { return JSON.parse(localStorage.getItem('m2m_last_items') || '[]'); } catch { return []; }
 }
-function restoreLastItems() {
-  const items = loadLastItems();
-  if (Array.isArray(items) && items.length) {
-    resultsCard.hidden = false;
-    renderCards(items);
-    window.lastTitles = items.map(it => it.title).filter(Boolean);
-    countEl.textContent = items.length ? `Total ${items.length}` : '';
-    setStatus('Restored');
+async function restoreLastItems() {
+  try {
+    const items = loadLastItems();
+    if (Array.isArray(items) && items.length) {
+      console.log('Restoring items:', items.length);
+      resultsCard.hidden = false;
+      await renderCards(items);
+      window.lastTitles = items.map(it => it.title).filter(Boolean);
+      countEl.textContent = items.length ? `Total ${items.length}` : '';
+      setStatus('Restored');
+      console.log('Items restored successfully');
+    } else {
+      console.log('No items to restore');
+    }
+  } catch (error) {
+    console.error('Error restoring items:', error);
+    setStatus('Restore failed');
   }
 }
 
@@ -642,6 +729,26 @@ function parseRecommendations(text) {
 
 // 获取海报（优先 TMDB；其次 OMDb；最后占位图）
 const _posterCache = new Map();
+
+// TMDB条款要求：缓存不超过6个月
+const TMDB_CACHE_DURATION = 6 * 30 * 24 * 60 * 60 * 1000; // 6个月（毫秒）
+
+function isCacheExpired(timestamp) {
+  return Date.now() - timestamp > TMDB_CACHE_DURATION;
+}
+
+// 清理过期的海报缓存
+function cleanExpiredPosterCache() {
+  const now = Date.now();
+  for (const [key, data] of _posterCache.entries()) {
+    if (data.timestamp && isCacheExpired(data.timestamp)) {
+      _posterCache.delete(key);
+    }
+  }
+}
+
+// 定期清理过期缓存（每小时检查一次）
+setInterval(cleanExpiredPosterCache, 60 * 60 * 1000);
 async function getTmdbPoster(title, year) {
   try {
     if (!TMDB_READ_TOKEN && !TMDB_API_KEY) return '';
@@ -682,7 +789,18 @@ async function getOmdbPoster(title, year) {
 
 async function getPosterUrl(title, year, candidate) {
   const key = `poster-${title}-${year ?? ''}`;
-  if (_posterCache.has(key)) return _posterCache.get(key);
+  
+  // 检查缓存是否存在且未过期
+  if (_posterCache.has(key)) {
+    const cachedData = _posterCache.get(key);
+    if (cachedData.timestamp && !isCacheExpired(cachedData.timestamp)) {
+      return cachedData.url;
+    } else {
+      // 缓存过期，删除旧缓存
+      _posterCache.delete(key);
+    }
+  }
+  
   const picsum = `https://image.tmdb.org/t/p/w500`; // placeholder prefix for tmdb; we'll fallback to picsum next
   // 1) Try TMDB
   let poster = await getTmdbPoster(title, year);
@@ -696,7 +814,13 @@ async function getPosterUrl(title, year, candidate) {
   if (!poster) poster = await getOmdbPoster(title, year);
   // 3) Final fallback
   if (!poster) poster = `https://picsum.photos/seed/${encodeURIComponent(title)}/300/450`;
-  _posterCache.set(key, poster);
+  
+  // 存储到缓存，包含时间戳
+  _posterCache.set(key, {
+    url: poster,
+    timestamp: Date.now()
+  });
+  
   return poster;
 }
 
@@ -837,11 +961,64 @@ function getMarks(title) {
   const m = s[title];
   return m && typeof m === 'object' ? m : { favorite: false, watched: false };
 }
+
+function getWatchedTitles() {
+  const s = loadStates();
+  const watchedTitles = Object.entries(s)
+    .filter(([_, v]) => v === 'seen' || (v && typeof v === 'object' && v.watched))
+    .map(([title, v]) => {
+      // 如果有完整的电影信息，使用存储的标题，否则使用键名
+      if (v && typeof v === 'object' && v.watched && v.title) {
+        return v.title;
+      }
+      return title;
+    });
+  
+  // 添加部分匹配的标题（处理 "Paddington" vs "Paddington 2" 的情况）
+  const expandedTitles = new Set(watchedTitles);
+  watchedTitles.forEach(title => {
+    // 如果标题包含数字，也添加不带数字的版本
+    const withoutNumber = title.replace(/\s+\d+$/, '');
+    if (withoutNumber !== title) {
+      expandedTitles.add(withoutNumber);
+    }
+    // 如果标题不包含数字，也添加带数字的版本
+    else {
+      // 添加常见的续集版本
+      for (let i = 2; i <= 5; i++) {
+        expandedTitles.add(`${title} ${i}`);
+      }
+    }
+  });
+  
+  return Array.from(expandedTitles);
+}
 function setMark(title, mark, on) {
   const s = loadStates();
   const cur = s[title] && typeof s[title] === 'object' ? s[title] : { favorite: false, watched: false };
   if (mark === 'favorite') cur.favorite = !!on;
   if (mark === 'watched') cur.watched = !!on;
+  s[title] = cur;
+  saveStates(s);
+}
+
+function setMarkWithDetails(title, mark, on, item, poster) {
+  const s = loadStates();
+  const cur = s[title] && typeof s[title] === 'object' ? s[title] : { favorite: false, watched: false };
+  if (mark === 'favorite') cur.favorite = !!on;
+  if (mark === 'watched') cur.watched = !!on;
+  
+  // 保存完整的电影信息
+  if (on) {
+    cur.title = item.title;
+    cur.year = item.year;
+    cur.poster_url = poster;
+    cur.genres = item.genres;
+    cur.rating = item.rating;
+    cur.runtime = item.runtime;
+    cur.country = item.country;
+  }
+  
   s[title] = cur;
   saveStates(s);
 }
@@ -935,7 +1112,7 @@ async function renderCards(items) {
     wishBtn?.addEventListener('click', async () => {
       const current = getMarks(item.title).favorite;
       const next = !current;
-      setMark(item.title, 'favorite', next);
+      setMarkWithDetails(item.title, 'favorite', next, item, poster);
       wishBtn.classList.toggle('active', next);
       if (next) {
         showToast('Added to Favourite');
@@ -948,7 +1125,7 @@ async function renderCards(items) {
     seenBtn?.addEventListener('click', async () => {
       const current = getMarks(item.title).watched;
       const next = !current;
-      setMark(item.title, 'watched', next);
+      setMarkWithDetails(item.title, 'watched', next, item, poster);
       seenBtn.classList.toggle('active', next);
       if (next) {
         showToast('Marked as Watched');
