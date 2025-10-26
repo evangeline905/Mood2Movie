@@ -68,3 +68,4 @@ logs
 # Temporary files
 tmp/
 temp/
+.vercel

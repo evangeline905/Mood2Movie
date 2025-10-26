@@ -20,6 +20,17 @@
     </style>
   </head>
   <body>
+    <!-- 密码保护模态框 -->
+    <div id="password-modal" class="password-modal">
+      <div class="password-content">
+        <h2>🔒 访问受限</h2>
+        <p>请输入访问密码：</p>
+        <input type="password" id="password-input" placeholder="请输入密码" />
+        <button id="password-submit" class="btn-primary">进入网站</button>
+        <p id="password-error" class="password-error" style="display: none;">密码错误，请重试</p>
+      </div>
+    </div>
+
     <header class="page-header">
       <img class="brand-logo" src="assets/img_v3_02r2_09222bfc-bdf2-41af-88a0-d0c7e6bb5feg.png" alt="Mood2Movie logo" />
       <h1 class="title">
@@ -205,11 +216,55 @@
         }
       }
 
-      // 不监听 Supabase 的认证状态变化，我们手动管理
-      // supabase.auth.onAuthStateChange(async () => { await refreshUser(); });
+        // 不监听 Supabase 的认证状态变化，我们手动管理
+        // supabase.auth.onAuthStateChange(async () => { await refreshUser(); });
 
-      // 初始刷新显示
-      refreshUser();
+        // 密码保护功能
+        const CORRECT_PASSWORD = 'mood2movie2025'; // 设置访问密码
+        const passwordModal = document.getElementById('password-modal');
+        const passwordInput = document.getElementById('password-input');
+        const passwordSubmit = document.getElementById('password-submit');
+        const passwordError = document.getElementById('password-error');
+
+        // 检查是否已经验证过密码
+        function checkPasswordAuth() {
+          const isAuthenticated = sessionStorage.getItem('mood2movie_auth') === 'true';
+          if (!isAuthenticated) {
+            passwordModal.style.display = 'flex';
+            document.body.style.overflow = 'hidden'; // 防止背景滚动
+          } else {
+            passwordModal.style.display = 'none';
+          }
+        }
+
+        // 验证密码
+        function verifyPassword() {
+          const inputPassword = passwordInput.value.trim();
+          if (inputPassword === CORRECT_PASSWORD) {
+            sessionStorage.setItem('mood2movie_auth', 'true');
+            passwordModal.style.display = 'none';
+            document.body.style.overflow = 'auto'; // 恢复滚动
+            passwordError.style.display = 'none';
+          } else {
+            passwordError.style.display = 'block';
+            passwordInput.value = '';
+            passwordInput.focus();
+          }
+        }
+
+        // 密码输入事件监听
+        passwordSubmit.addEventListener('click', verifyPassword);
+        passwordInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            verifyPassword();
+          }
+        });
+
+        // 先检查密码验证
+        checkPasswordAuth();
+
+        // 初始刷新显示
+        refreshUser();
     </script>
   </body>
 </html>
