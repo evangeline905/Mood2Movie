@@ -347,58 +347,13 @@ stopBtn?.addEventListener('click', () => {
   stopGenQuotes();
 });
 
-// 密码保护功能
-const CORRECT_PASSWORD = 'mood2movie2025'; // 设置访问密码
-const passwordModal = document.getElementById('password-modal');
-const passwordInput = document.getElementById('password-input');
-const passwordSubmit = document.getElementById('password-submit');
-const passwordError = document.getElementById('password-error');
-
-// 检查是否已经验证过密码
-function checkPasswordAuth() {
-  const isAuthenticated = sessionStorage.getItem('mood2movie_auth') === 'true';
-  if (!isAuthenticated) {
-    passwordModal.style.display = 'flex';
-    document.body.style.overflow = 'hidden'; // 防止背景滚动
-  } else {
-    passwordModal.style.display = 'none';
-  }
-}
-
-// 验证密码
-function verifyPassword() {
-  const inputPassword = passwordInput.value.trim();
-  if (inputPassword === CORRECT_PASSWORD) {
-    sessionStorage.setItem('mood2movie_auth', 'true');
-    passwordModal.style.display = 'none';
-    document.body.style.overflow = 'auto'; // 恢复滚动
-    passwordError.style.display = 'none';
-  } else {
-    passwordError.style.display = 'block';
-    passwordInput.value = '';
-    passwordInput.focus();
-  }
-}
-
-// 密码输入事件监听
-passwordSubmit.addEventListener('click', verifyPassword);
-passwordInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') {
-    verifyPassword();
-  }
-});
 
 // Restore last items on page load - use DOMContentLoaded to ensure DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    // 先检查密码验证
-    checkPasswordAuth();
-    
-    // 如果已验证，则恢复项目
-    if (sessionStorage.getItem('mood2movie_auth') === 'true') {
-      console.log('DOM loaded, attempting to restore items...');
-      await restoreLastItems();
-    }
+    console.log('DOM loaded, attempting to restore items...');
+    await restoreLastItems();
+    console.log('Items restored successfully');
   } catch (error) {
     console.error('Failed to restore items on DOM load:', error);
   }
