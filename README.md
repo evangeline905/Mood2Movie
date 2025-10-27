@@ -48,7 +48,7 @@ Mood2Movie is an AI-powered movie recommendation platform that uses Chrome's bui
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/Mood2Movie.git
+   git clone https://github.com/evangeline905/Mood2Movie.git
    cd Mood2Movie
    ```
 
