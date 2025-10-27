@@ -15,6 +15,36 @@ Mood2Movie is an AI-powered movie recommendation platform that uses Chrome's bui
 - 🎯 **Smart Filtering** - Avoids recommending movies you've already watched
 - 🌍 **Multi-language Support** - Supports English and Chinese interfaces
 
+## 🌐 Website Structure
+
+```
+Mood2Movie Website
+├── 🏠 Home Page (index.html)
+│   ├── 📝 Movie Recommendation Form
+│   ├── 🎯 AI-Powered Suggestions
+│   ├── 🎫 Movie Ticket Display
+│   ├── ❤️ Favorite/Watched Actions
+│   └── 🔄 Refresh Batch Feature
+│
+├── 🔐 Authentication (auth.html)
+│   ├── 🔑 Google OAuth Login
+│   ├── 👤 User Session Management
+│   ├── 🚪 Sign Out Functionality
+│   └── 🔄 Session Restoration
+│
+├── 👤 User Profile (profile.html)
+│   ├── ❤️ Favorites Collection
+│   ├── 👁️ Watched Movies
+│   ├── 🗑️ Remove Actions
+│   └── ☁️ Cloud Sync Status
+│
+└── 🔧 Backend Services
+    ├── 🌐 Express Server (server.js)
+    ├── 🗄️ Supabase Database
+    ├── 🎬 TMDB API Integration
+    └── 🔍 OMDb API Fallback
+```
+
 ## 🛠️ Tech Stack
 
 ### Frontend
