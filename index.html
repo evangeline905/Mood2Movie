@@ -141,6 +141,22 @@
         }
       }
 
+      function updateWishLabel(user) {
+        try {
+          const wishLabelEl = document.querySelector('label[for="wish"]');
+          const DEFAULT_WISH_LABEL = 'Describe the genre, plot, or mood you\'re interested in, and I\'ll match movies to it.';
+          if (!wishLabelEl) return;
+          if (user) {
+            const name = user.user_metadata?.full_name || user.email || user.id;
+            // 当有用户名时，将"Describe"改为"describe"
+            const personalizedLabel = DEFAULT_WISH_LABEL.replace('Describe', 'describe');
+            wishLabelEl.textContent = `${name}, ${personalizedLabel}`;
+          } else {
+            wishLabelEl.textContent = DEFAULT_WISH_LABEL;
+          }
+        } catch {}
+      }
+
       async function updateUI() {
         try {
           // 首先尝试从 localStorage 恢复会话
@@ -160,6 +176,8 @@
                   console.log('Session is valid, using stored session');
                   badge.textContent = sessionData.user.user_metadata?.full_name || sessionData.user.email || sessionData.user.id;
                   setMyMoviesEnabled(true);
+                  // 更新标签显示用户名
+                  updateWishLabel(sessionData.user);
                   return;
                 } else {
                   console.log('Stored session expired, removing...');
@@ -169,6 +187,8 @@
                 console.log('No expiration time, using stored session');
                 badge.textContent = sessionData.user.user_metadata?.full_name || sessionData.user.email || sessionData.user.id;
                 setMyMoviesEnabled(true);
+                // 更新标签显示用户名
+                updateWishLabel(sessionData.user);
                 return;
               }
             } catch (parseError) {
@@ -181,10 +201,14 @@
           console.log('No valid stored session found');
           badge.textContent = 'Not signed in';
           setMyMoviesEnabled(false);
+          // 更新标签为默认状态
+          updateWishLabel(null);
         } catch (error) {
           console.error('Error checking session:', error);
           badge.textContent = 'Not signed in';
           setMyMoviesEnabled(false);
+          // 更新标签为默认状态
+          updateWishLabel(null);
         }
       }
 

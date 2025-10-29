@@ -70,8 +70,10 @@ function stopGenQuotes() {
 
 let controller = null;
 let session = null;
-// 标记是否曾经有过有效会话，用于避免初始化时的误报“Signed out”
+// 标记是否曾经有过有效会话，用于避免初始化时的误报"Signed out"
 let hadAuthSession = false;
+// 标记是否正在生成推荐，防止恢复逻辑干扰
+let isGenerating = false;
 
 // Supabase client (injected in index.html)
 const supabase = typeof window !== 'undefined' ? window.supabaseClient : null;
@@ -357,11 +359,74 @@ stopBtn?.addEventListener('click', () => {
 // Restore last items on page load - use DOMContentLoaded to ensure DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    console.log('DOM loaded, attempting to restore items...');
-    await restoreLastItems();
-    console.log('Items restored successfully');
+    console.log('DOM loaded, checking if should restore items...');
+    
+    // 检查是否应该恢复推荐
+    const urlParams = new URLSearchParams(window.location.search);
+    const shouldRestore = urlParams.get('restore') === 'true';
+    const isFromOtherPage = document.referrer && document.referrer.includes(window.location.hostname);
+    const hasStoredItems = localStorage.getItem('m2m_last_items');
+    
+    console.log('Restore check:', { shouldRestore, isFromOtherPage, hasStoredItems });
+    
+    // 只有在明确要求恢复或从其他页面返回时才恢复推荐，且不在生成过程中
+    if (!isGenerating && (shouldRestore || (isFromOtherPage && hasStoredItems))) {
+      console.log('Restoring items due to navigation...');
+      await restoreLastItems();
+      console.log('Items restored successfully');
+      
+      // 清除URL参数以避免重复恢复
+      if (shouldRestore) {
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.delete('restore');
+        window.history.replaceState({}, '', newUrl);
+      }
+    } else {
+      console.log('Fresh page load, not restoring items');
+    }
+    
+    // 标记当前会话
+    sessionStorage.setItem('m2m_has_session', 'true');
   } catch (error) {
     console.error('Failed to restore items on DOM load:', error);
+  }
+});
+
+// Listen for storage changes to sync button states across pages
+window.addEventListener('storage', (e) => {
+  if (e.key === 'm2m_states') {
+    console.log('Storage changed, updating button states...');
+    // Update button states for all visible movie cards
+    document.querySelectorAll('.ticket-page').forEach((page) => {
+      const title = page.querySelector('.ticket-title')?.textContent?.trim();
+      if (title) {
+        const marks = getMarks(title);
+        const wishBtn = page.querySelector('.wish-btn');
+        const seenBtn = page.querySelector('.seen-btn');
+        
+        if (wishBtn) wishBtn.classList.toggle('active', marks.favorite);
+        if (seenBtn) seenBtn.classList.toggle('active', marks.watched);
+      }
+    });
+  }
+});
+
+// 监听页面可见性变化，当从其他页面返回时恢复推荐
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    // 页面变为可见时，检查是否需要恢复推荐
+    const urlParams = new URLSearchParams(window.location.search);
+    const shouldRestore = urlParams.get('restore') === 'true';
+    const hasStoredItems = localStorage.getItem('m2m_last_items');
+    const hasVisibleItems = document.querySelectorAll('.ticket-page').length > 0;
+    
+    // 只有在明确要求恢复且没有可见项目且不在生成过程中时才恢复
+    if (!isGenerating && shouldRestore && hasStoredItems && !hasVisibleItems) {
+      console.log('Page became visible and restore requested, attempting restore...');
+      restoreLastItems().catch(error => {
+        console.error('Failed to restore items on visibility change:', error);
+      });
+    }
   }
 });
 
@@ -371,6 +436,9 @@ async function startRecommendation(reroll = false) {
     showToast('请先描述你想看的电影，再开始推荐～');
     return;
   }
+  
+  // 设置生成标志，防止恢复逻辑干扰
+  isGenerating = true;
   
   // 保存用户输入，以便Refresh Batch使用
   localStorage.setItem('m2m_last_input', content);
@@ -428,14 +496,14 @@ async function startRecommendation(reroll = false) {
   
          // 如果用户已经观看了某些电影，在prompt中明确禁止推荐
          const exclusionRule = watchedTitlesStr ? 
-           `\n\n🚫 ABSOLUTELY FORBIDDEN - DO NOT RECOMMEND ANY OF THESE MOVIES:\n${watchedTitlesStr}\n\nMANDATORY RULE: If you see any movie title that matches or is similar to the above list, DO NOT include it in your recommendations. This is a hard requirement that cannot be violated.` : '';
+           `\n\n🚫 ABSOLUTELY FORBIDDEN - DO NOT RECOMMEND ANY OF THESE MOVIES:\n${watchedTitlesStr}\n\n**CRITICAL RULE**: You MUST NOT recommend any movie that matches or is similar to the above list. This includes:\n- Exact title matches\n- Partial title matches\n- Similar sounding titles\n- Movies with similar themes from the same director\n\n**EXCEPTION**: If the user input is a very specific movie title or director name (e.g., "The Godfather", "Christopher Nolan movies"), and that specific movie is in the forbidden list above, you MAY still recommend it if it's a perfect match for the user's request. This overrides the exclusion rule for precise matches only.\n\nIf you see ANY similarity to the forbidden list above (except for precise matches), choose a DIFFERENT movie instead. This is non-negotiable.` : '';
   try {
     session = await LanguageModel.create({
       signal: controller.signal,
       language: 'en', // 指定输出语言为英语
       initialPrompts: [{
         role: 'system',
-         content: `You are Mood2Movie, a professional AI movie curator. Based on the user's mood, preferences, and region, recommend suitable movies.\n\n**MOST IMPORTANT RULE**: NEVER recommend any movie that the user has already watched. This is the #1 priority.\n\nRequirements:\n1. Output MUST be strict JSON and follow the schema exactly.\n2. Each recommendation is a "movie ticket" with title, short reason, watchability, rating, etc.\n3. Keep the reason short, warm, and spoiler-free.\n4. Do NOT add explanations or extra text; the JSON is the final output.\n5. Output language: English.\n6. If the user mentions titles or genres, prioritize semantically related films.\n7. Recommend 3 movies each time.\n8. If user requests a reroll, avoid repeating titles from the previous batch.\n9. **CRITICAL**: NEVER recommend movies that the user has already watched. Check the "Already watched movies" list carefully.\n\nOutput format (strict JSON):\n{\n  "recommendations": [\n    {\n      "title": "string(movie title)",\n      "year": "number(release year)",\n      "reason": "string(≤ 40 words)",\n      "genres": ["string"],\n      "rating": "number(0~10)",\n      "runtime": "string(e.g., '102 min')",\n      "country": "string",\n      "availability": "string(e.g., 'Available on Netflix' or 'Disney+')",\n      "poster": "string(poster URL)",\n      "match_score": "number(0~100)",\n      "user_mood": "string(user mood)",\n      "recommendation_id": "string(e.g., 'M2M-{{date}}-001')",\n      "theme_color": "string(e.g., '#EAE0C8')"\n    }\n  ]\n}\n\nContext:\nUser mood: ${mood}\nPreferred language: ${lang}\nLiked titles: ${liked_titles}\nExclude titles: ${excludes}${exclusionRule}\nProviders: ${providers}\nRegion: ${region}${prevTitles ? `\nPrevious batch titles (avoid duplicates): ${prevTitles}` : ''}\n\n**FINAL REMINDER**: Before outputting any movie title, double-check that it is NOT in the forbidden list above. If you see any similarity, choose a different movie instead.\n\nReturn ONLY the JSON that follows the schema above; no extra text.`,
+         content: `You are Mood2Movie, a professional AI movie curator. Based on the user's mood, preferences, and region, recommend suitable movies.\n\n**MOST IMPORTANT RULE**: NEVER recommend any movie that the user has already watched. This is the #1 priority.\n\nRequirements:\n1. Output MUST be strict JSON and follow the schema exactly.\n2. Each recommendation is a "movie ticket" with title, short reason, watchability, rating, etc.\n3. Keep the reason short, warm, and spoiler-free.\n4. Do NOT add explanations or extra text; the JSON is the final output.\n5. Output language: English.\n6. If the user mentions titles or genres, prioritize semantically related films. If the user asks for films by a specific director (e.g., "films by the director of [movie name]"), you MUST recommend movies by that exact director.\n7. **CRITICAL REQUIREMENT**: You MUST ALWAYS recommend exactly 3 movies. This is non-negotiable. Never return fewer than 3 movies. If you think there aren't enough movies, you're wrong - there are thousands of movies available. Expand your search criteria, consider similar genres, different decades, international films, or lesser-known gems. ALWAYS find 3 movies.\n8. **IMPORTANT**: If this is a refresh batch (reroll), actively seek out DIFFERENT movies from the previous batch. Explore diverse options within the same theme/genre/director. For example, if previous batch had "Fight Club", try "Se7en", "Gone Girl", "The Social Network", "Zodiac", "The Girl with the Dragon Tattoo", etc.\n9. **CRITICAL**: NEVER recommend movies that the user has already watched. Check the "Already watched movies" list carefully.\n10. **EXCEPTION RULE**: If the user input is a very specific movie title or director name (e.g., "The Godfather", "Christopher Nolan movies"), and that specific movie is in the watched list, you MAY still recommend it if it's a perfect match for the user's request. This overrides the "exclude watched" rule for precise matches only.\n11. **DIRECTOR IDENTIFICATION RULE**: When user asks for "films by the director of [movie name]" or similar requests, you MUST identify the director of that movie and recommend ONLY movies by that specific director. For example:\n    - "films by the director of Cinema Paradiso" → Recommend movies by Giuseppe Tornatore\n    - "movies by the director of Inception" → Recommend movies by Christopher Nolan\n    - "other films by the director of Pulp Fiction" → Recommend movies by Quentin Tarantino\n    - "I want to watch Giuseppe Tornatore's movie" → Recommend ONLY movies by Giuseppe Tornatore\n\n**CRITICAL**: If the user specifies a director name or asks for films by a specific director, ALL recommendations MUST be by that exact director. Do not mix directors or recommend movies by other directors.\n\nOutput format (strict JSON):\n{\n  "recommendations": [\n    {\n      "title": "string(movie title)",\n      "year": "number(release year)",\n      "reason": "string(≤ 40 words)",\n      "genres": ["string"],\n      "rating": "number(0~10)",\n      "runtime": "string(e.g., '102 min')",\n      "country": "string",\n      "availability": "string(e.g., 'Available on Netflix' or 'Disney+')",\n      "poster": "string(poster URL)",\n      "match_score": "number(0~100)",\n      "user_mood": "string(user mood)",\n      "recommendation_id": "string(e.g., 'M2M-{{date}}-001')",\n      "theme_color": "string(e.g., '#EAE0C8')"\n    }\n  ]\n}\n\nContext:\nUser mood: ${mood}\nPreferred language: ${lang}\nLiked titles: ${liked_titles}\nExclude titles: ${excludes}${exclusionRule}\nProviders: ${providers}\nRegion: ${region}${prevTitles ? `\nPrevious batch titles (avoid duplicates): ${prevTitles}` : ''}${reroll ? '\n**THIS IS A REFRESH BATCH - Please recommend EXACTLY 3 DIFFERENT movies from the previous batch while maintaining the same theme/genre/director preference. There are thousands of movies available, so finding 3 different movies should always be possible. Explore diverse options within the same theme.**' : ''}${reroll && prevTitles ? `\n\n🚫 REFRESH BATCH EXCLUSION - DO NOT RECOMMEND ANY OF THESE PREVIOUS RECOMMENDATIONS:\n${prevTitles}\n\n**CRITICAL**: You MUST NOT recommend any movie that matches or is similar to the previous batch titles above. Choose completely different movies while maintaining the same mood/genre preference.` : ''}\n\n**DIRECTOR CHECK**: If the user input mentions a specific director name (like "Giuseppe Tornatore", "Christopher Nolan", "Quentin Tarantino", etc.) or asks for films by a specific director, ALL 3 recommendations MUST be by that exact director. Do not mix directors.\n\n**FINAL REMINDER**: Before outputting any movie title, double-check that it is NOT in the forbidden list above. If you see any similarity, choose a different movie instead.\n\nReturn ONLY the JSON that follows the schema above; no extra text.`,
       }],
       monitor(m) {
         downloadEl.hidden = false;
@@ -504,11 +572,55 @@ async function startRecommendation(reroll = false) {
       parsed = parseJsonRecommendations(finalText) || parseRecommendations(finalText);
       items = Array.isArray(parsed?.recommendations) ? parsed.recommendations : parsed;
     }
-    const limited = (items || []).slice(0, 3); // 获取3部电影
+    console.log('AI generated items:', items?.length || 0, items);
     
-    // 过滤掉已观看的电影
+    // 如果AI没有生成3部电影，记录警告并尝试重新生成
+    if (!items || items.length < 3) {
+      console.warn('AI generated', items?.length || 0, 'movies instead of 3');
+      console.warn('This might be due to:', {
+        watchedMovies: watchedTitles.length,
+        previousBatch: reroll ? window.lastTitles?.length || 0 : 0,
+        userInput: content,
+        reroll: reroll
+      });
+      
+      // 如果电影数量不足，尝试重新生成一次
+      if (items && items.length > 0 && items.length < 3) {
+        console.log('Attempting to generate additional movies...');
+        const neededCount = 3 - items.length;
+        try {
+          const additionalPrompt = `Generate exactly ${neededCount} more ${reroll ? 'different' : ''} movie(s) for ${reroll ? 'refresh batch' : 'initial generation'}. Make sure they are different from the previous ones and follow the same criteria. Return ONLY valid JSON with the same format.`;
+          console.log('Additional prompt:', additionalPrompt);
+          
+          const additionalResult = await session.prompt(additionalPrompt);
+          const additionalText = typeof additionalResult === 'string' ? additionalResult : (additionalResult?.text ?? JSON.stringify(additionalResult));
+          console.log('Additional AI response:', additionalText);
+          
+          const additionalParsed = parseJsonRecommendations(additionalText) || parseRecommendations(additionalText);
+          const additionalItems = Array.isArray(additionalParsed?.recommendations) ? additionalParsed.recommendations : additionalParsed;
+          console.log('Parsed additional items:', additionalItems);
+          
+          if (additionalItems && additionalItems.length > 0) {
+            // 合并结果，避免重复
+            const existingTitles = new Set(items.map(item => item.title?.toLowerCase()));
+            const newItems = additionalItems.filter(item => 
+              item.title && !existingTitles.has(item.title.toLowerCase())
+            );
+            items = [...items, ...newItems].slice(0, 3);
+            console.log('Added', newItems.length, 'additional movies, total:', items.length);
+          } else {
+            console.warn('No additional items generated or parsed');
+          }
+        } catch (error) {
+          console.warn('Failed to generate additional movies:', error);
+        }
+      }
+    }
+    
+    // 过滤掉已观看的电影（AI提示已经处理，这里只是额外保险）
     const watchedTitles = getWatchedTitles();
-    const filtered = limited.filter(item => {
+    console.log('Watched titles to filter:', watchedTitles);
+    const filtered = (items || []).filter(item => {
       const title = item.title || '';
       const isWatched = watchedTitles.some(watchedTitle => {
         // 检查标题是否匹配或相似
@@ -516,19 +628,87 @@ async function startRecommendation(reroll = false) {
                watchedTitle.toLowerCase().includes(title.toLowerCase());
       });
       if (isWatched) {
-        // 过滤掉已观看的电影
+        console.log('Filtered out watched movie:', title);
       }
       return !isWatched;
     });
+    console.log('After filtering watched movies:', filtered.length, filtered.map(f => f.title));
     
-    // 直接显示过滤后的电影（如果不足3部就显示可用的）
-    renderCards(filtered);
-    try { saveLastItems(filtered); } catch {}
-    window.lastTitles = filtered.map(it => it.title).filter(Boolean);
-    countEl.textContent = filtered.length ? `Total ${filtered.length}` : '';
+    // 如果是Refresh Batch，还要过滤掉上一批推荐过的电影（AI提示已经处理，这里只是额外保险）
+    let finalFiltered = filtered;
+    if (reroll && window.lastTitles && window.lastTitles.length > 0) {
+      console.log('Refresh Batch: Filtering out previous recommendations:', window.lastTitles);
+      finalFiltered = filtered.filter(item => {
+        const title = item.title || '';
+        const isPreviousRecommendation = window.lastTitles.some(prevTitle => {
+          return title.toLowerCase() === prevTitle.toLowerCase() ||
+                 title.toLowerCase().includes(prevTitle.toLowerCase()) ||
+                 prevTitle.toLowerCase().includes(title.toLowerCase());
+        });
+        if (isPreviousRecommendation) {
+          console.log('Filtered out duplicate:', title);
+        }
+        return !isPreviousRecommendation;
+      });
+      console.log('After filtering duplicates:', finalFiltered.length, 'movies remaining');
+    }
+    
+    // 如果过滤后仍然不足3部电影，尝试重新生成
+    let finalItems = finalFiltered.slice(0, 3);
+    console.log('Final items count after filtering:', finalItems.length);
+    
+    // 如果最终结果不足3部电影，强制重新生成
+    if (finalItems.length < 3) {
+      console.warn('CRITICAL: Only', finalItems.length, 'movies after filtering. Attempting emergency regeneration...');
+      try {
+        const emergencyPrompt = `EMERGENCY: Generate exactly ${3 - finalItems.length} more movie(s) that are NOT in this list: ${finalItems.map(f => f.title).join(', ')}. ${reroll ? 'This is a refresh batch, so make them different from previous recommendations.' : ''} Return ONLY valid JSON.`;
+        console.log('Emergency prompt:', emergencyPrompt);
+        
+        const emergencyResult = await session.prompt(emergencyPrompt);
+        const emergencyText = typeof emergencyResult === 'string' ? emergencyResult : (emergencyResult?.text ?? JSON.stringify(emergencyResult));
+        console.log('Emergency AI response:', emergencyText);
+        
+        const emergencyParsed = parseJsonRecommendations(emergencyText) || parseRecommendations(emergencyText);
+        const emergencyItems = Array.isArray(emergencyParsed?.recommendations) ? emergencyParsed.recommendations : emergencyParsed;
+        console.log('Emergency parsed items:', emergencyItems);
+        
+        if (emergencyItems && emergencyItems.length > 0) {
+          // 合并结果
+          const existingTitles = new Set(finalItems.map(item => item.title?.toLowerCase()));
+          const newEmergencyItems = emergencyItems.filter(item => 
+            item.title && !existingTitles.has(item.title.toLowerCase())
+          );
+          finalItems = [...finalItems, ...newEmergencyItems].slice(0, 3);
+          console.log('Emergency: Added', newEmergencyItems.length, 'movies, total:', finalItems.length);
+        }
+      } catch (error) {
+        console.error('Emergency regeneration failed:', error);
+      }
+    }
+    
+    console.log('Final items count:', finalItems.length);
+    
+    // 为每部电影生成并保存完整的描述内容
+    for (const item of finalItems) {
+      if (!item.emotionLine) {
+        item.emotionLine = await buildEmotionLine(window.lastUserMood || '', item);
+        console.log('Generated emotionLine for', item.title, ':', item.emotionLine);
+      }
+      if (!item.synopsis) {
+        item.synopsis = await buildSynopsisChrome(window.lastUserMood || '', item);
+        console.log('Generated synopsis for', item.title, ':', item.synopsis);
+      }
+    }
+    
+    // 直接显示最终的电影列表
+    console.log('Final items to render:', finalItems.length, finalItems);
+    renderCards(finalItems);
+    try { saveLastItems(finalItems); } catch {}
+    window.lastTitles = finalItems.map(it => it.title).filter(Boolean);
+    countEl.textContent = finalItems.length ? `Total ${finalItems.length}` : '';
     // 若无法解析为卡片，则直接展示文本内容
-    resultEl.hidden = !!filtered.length;
-    if (!filtered.length) {
+    resultEl.hidden = !!finalItems.length;
+    if (!finalItems.length) {
       resultEl.textContent = finalText || 'No recommendations found.';
     }
     setStatus('Done');
@@ -537,6 +717,8 @@ async function startRecommendation(reroll = false) {
     goBtn.disabled = false;
     goBtn.textContent = 'Generate';
     goBtn.classList.remove('generating');
+    // 清除生成标志
+    isGenerating = false;
   } catch (err) {
     console.error(err);
     setStatus('Error');
@@ -546,6 +728,8 @@ async function startRecommendation(reroll = false) {
     goBtn.disabled = false;
     goBtn.textContent = 'Generate';
     goBtn.classList.remove('generating');
+    // 清除生成标志
+    isGenerating = false;
   }
 }
 
@@ -590,6 +774,7 @@ async function restoreLastItems() {
     const items = loadLastItems();
     if (Array.isArray(items) && items.length) {
       console.log('Restoring items:', items.length);
+      console.log('First item data:', items[0]);
       resultsCard.hidden = false;
       await renderCards(items);
       window.lastTitles = items.map(it => it.title).filter(Boolean);
@@ -760,20 +945,47 @@ setInterval(cleanExpiredPosterCache, 60 * 60 * 1000);
 async function getTmdbPoster(title, year) {
   try {
     if (!TMDB_READ_TOKEN && !TMDB_API_KEY) return '';
+    
+    // 清理标题，移除常见的干扰词
+    const cleanTitle = title.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    
     const url = new URL('https://api.themoviedb.org/3/search/movie');
-    url.searchParams.set('query', title);
+    url.searchParams.set('query', cleanTitle);
     url.searchParams.set('include_adult', 'false');
     const lang = (window.USER_LANG && String(window.USER_LANG).toLowerCase().startsWith('zh')) ? 'zh-CN' : 'en-US';
     url.searchParams.set('language', lang);
     if (year) url.searchParams.set('year', String(year));
+    
     const headers = TMDB_READ_TOKEN ? { Authorization: `Bearer ${TMDB_READ_TOKEN}` } : {};
     if (!TMDB_READ_TOKEN && TMDB_API_KEY) url.searchParams.set('api_key', TMDB_API_KEY);
+    
+    console.log('TMDB search:', { title: cleanTitle, year, url: url.toString() });
+    
     const res = await fetch(url.toString(), { headers });
+    if (!res.ok) {
+      console.warn('TMDB API error:', res.status, res.statusText);
+      return '';
+    }
+    
     const data = await res.json();
-    const posterPath = data?.results?.[0]?.poster_path;
-    if (!posterPath) return '';
-    return `https://image.tmdb.org/t/p/w500${posterPath}`;
-  } catch {
+    console.log('TMDB response:', { results: data?.results?.length || 0, query: cleanTitle });
+    
+    // 尝试找到最佳匹配
+    if (data?.results && data.results.length > 0) {
+      // 优先选择有海报的结果
+      const withPoster = data.results.filter(movie => movie.poster_path);
+      const bestMatch = withPoster.length > 0 ? withPoster[0] : data.results[0];
+      
+      if (bestMatch.poster_path) {
+        const posterUrl = `https://image.tmdb.org/t/p/w500${bestMatch.poster_path}`;
+        console.log('Found TMDB poster:', posterUrl, 'for', bestMatch.title);
+        return posterUrl;
+      }
+    }
+    
+    return '';
+  } catch (error) {
+    console.warn('TMDB API error:', error);
     return '';
   }
 }
@@ -795,7 +1007,7 @@ async function getOmdbPoster(title, year) {
   }
 }
 
-async function getPosterUrl(title, year, candidate) {
+async function getPosterUrl(title, year, candidate, genres = []) {
   const key = `poster-${title}-${year ?? ''}`;
   
   // 检查缓存是否存在且未过期
@@ -820,8 +1032,20 @@ async function getPosterUrl(title, year, candidate) {
   if (!poster && candidate && isValidUrl(candidate)) poster = candidate.trim();
   // 2) Fallback OMDb
   if (!poster) poster = await getOmdbPoster(title, year);
-  // 3) Final fallback
-  if (!poster) poster = `https://picsum.photos/seed/${encodeURIComponent(title)}/300/450`;
+  // 3) Final fallback - 使用电影主题的占位图
+  if (!poster) {
+    // 根据电影类型生成不同的占位图
+    const genre = Array.isArray(genres) && genres.length > 0 ? genres[0].toLowerCase() : '';
+    let placeholderType = 'movie';
+    
+    if (genre.includes('horror') || genre.includes('thriller')) placeholderType = 'horror';
+    else if (genre.includes('comedy')) placeholderType = 'comedy';
+    else if (genre.includes('action') || genre.includes('adventure')) placeholderType = 'action';
+    else if (genre.includes('romance') || genre.includes('drama')) placeholderType = 'drama';
+    else if (genre.includes('sci-fi') || genre.includes('fantasy')) placeholderType = 'scifi';
+    
+    poster = `https://via.placeholder.com/300x450/2c3e50/ffffff?text=${encodeURIComponent(title)}`;
+  }
   
   // 存储到缓存，包含时间戳
   _posterCache.set(key, {
@@ -875,7 +1099,50 @@ function buildEmotionFallback(mood, item) {
   const lead = shortMood(mood);
   const g = Array.isArray(item.genres) && item.genres.length ? `${item.genres[0]}` : '';
   const base = g ? `This ${g} film` : 'This film';
-  return `${base} offers warm, hopeful support for your mood: "${lead}".`;
+  
+  // Create unique emotional descriptions based on movie title and genre
+  const title = item.title || '';
+  const genre = g || '';
+  
+  // Different emotional templates based on genre
+  const templates = {
+    'Thriller': [
+      `This ${genre} film delivers intense suspense that matches your mood: "${lead}".`,
+      `Experience gripping tension with this ${genre} that resonates with your current feelings.`,
+      `This ${genre} offers compelling drama that speaks to your mood: "${lead}".`
+    ],
+    'Comedy': [
+      `This ${genre} film brings joyful laughter that uplifts your mood: "${lead}".`,
+      `Find light-hearted humor in this ${genre} that brightens your current state.`,
+      `This ${genre} offers cheerful entertainment that matches your mood: "${lead}".`
+    ],
+    'Drama': [
+      `This ${genre} film explores deep emotions that connect with your mood: "${lead}".`,
+      `Experience heartfelt storytelling in this ${genre} that resonates with your feelings.`,
+      `This ${genre} offers meaningful moments that speak to your current mood.`
+    ],
+    'Horror': [
+      `This ${genre} film provides thrilling chills that match your mood: "${lead}".`,
+      `Experience intense suspense with this ${genre} that resonates with your feelings.`,
+      `This ${genre} offers gripping tension that speaks to your current state.`
+    ]
+  };
+  
+  // Get templates for the genre, or use default
+  const genreTemplates = templates[genre] || [
+    `This film offers compelling storytelling that matches your mood: "${lead}".`,
+    `Experience engaging drama in this film that resonates with your feelings.`,
+    `This film provides meaningful moments that speak to your current mood.`
+  ];
+  
+  // Use movie title hash to consistently pick the same template for the same movie
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = ((hash << 5) - hash + title.charCodeAt(i)) & 0xffffffff;
+  }
+  const templateIndex = Math.abs(hash) % genreTemplates.length;
+  
+  return genreTemplates[templateIndex];
 }
 
 // Clean reason: remove trailing meta like country/year/runtime/rating and keep first sentence
@@ -1044,16 +1311,28 @@ function setState(title, state) {
 }
 
 async function renderCards(items) {
-  // 强制只显示 3 条
-  items = (items || []).slice(0, 3);
-  cardsEl.innerHTML = '';
-  if (!items.length) return;
+  try {
+    // 强制只显示 3 条
+    items = (items || []).slice(0, 3);
+    console.log('renderCards called with:', items.length, 'items');
+    cardsEl.innerHTML = '';
+    if (!items.length) {
+      console.log('No items to render');
+      return;
+    }
   for (const item of items) {
-    const poster = await getPosterUrl(item.title, item.year, item.posterUrl);
+    const poster = await getPosterUrl(item.title, item.year, item.posterUrl, item.genres);
     const page = document.createElement('div');
     page.className = 'ticket-page';
     const moodSummary = buildMoodSummary(window.lastUserMood || '', item);
-    const synopsis = await buildSynopsisChrome(window.lastUserMood || '', item);
+    
+    // 优先使用已保存的描述内容，如果没有则使用reason作为备用
+    let synopsis = item.synopsis || item.savedSynopsis;
+    if (!synopsis) {
+      // 如果没有保存的描述，使用reason作为备用，不再重新生成
+      synopsis = buildSynopsis(item) || 'A compelling story that matches your current mood.';
+    }
+    
     const stars = starsFromRating(item.rating);
     const minutes = extractMinutes(item.runtime);
     // Build single-line info: Countries / Genres / Release / Runtime (English)
@@ -1074,7 +1353,12 @@ async function renderCards(items) {
     const infoLine = [countries, genresStr, releaseStr, runtimeStr].filter(Boolean).join(' / ');
     const ratingNum = (item.rating != null && Number.isFinite(Number(item.rating))) ? Number(item.rating).toFixed(1) : '';
     const ratingLine = ratingNum ? `<div class="ticket-stars">${stars} ${ratingNum}/10</div>` : '';
-    const subtitleText = await buildEmotionLine(window.lastUserMood || '', item);
+    // 优先使用已保存的情感描述，如果没有则使用备用模板
+    let subtitleText = item.emotionLine || item.savedEmotionLine;
+    if (!subtitleText) {
+      // 如果没有保存的情感描述，使用备用模板，不再重新生成
+      subtitleText = buildEmotionFallback(window.lastUserMood || '', item);
+    }
     page.innerHTML = `
       <article class="ticket">
         <span class="notch left"></span>
@@ -1143,6 +1427,12 @@ async function renderCards(items) {
         await removeCloudMarkByTitleYear('watched', item.title, item.year);
       }
     });
+  }
+  } catch (error) {
+    console.error('Error in renderCards:', error);
+    console.log('Items that caused error:', items);
+    // 如果渲染出错，显示错误信息
+    cardsEl.innerHTML = '<div class="error-message">Error rendering movie cards. Please try again.</div>';
   }
 
   // 尝试从云端拉取用户的收藏，并与本地状态合并

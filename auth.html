@@ -39,7 +39,7 @@
             Continue with Google
           </button>
           <button id="signout" class="oauth-btn" type="button">Sign out</button>
-          <a class="btn-link" href="index.html" aria-label="Back to Home">← Back to Home</a>
+          <a class="btn-link" href="index.html?restore=true" aria-label="Back to Home">← Back to Home</a>
           <div id="whoami" class="auth-status">Not signed in</div>
         </div>
       </section>
@@ -185,7 +185,7 @@
                 expires_at: parsed.expires_at
               });
               console.log('Redirecting to index...');
-              window.location.replace('index.html');
+              window.location.replace('index.html?restore=true');
             } else {
               console.log('Session storage verification failed');
               who.textContent = 'Failed to save session - please try again';
@@ -205,6 +205,7 @@
           who.textContent = `Signed in as ${data.session.user.email || data.session.user.id}`;
         }
       }
+
 
         // 不监听 Supabase 的认证状态变化，我们手动管理
         // supabase.auth.onAuthStateChange(async () => { await refreshUser(); });

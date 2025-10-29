@@ -23,7 +23,7 @@
         <span>My</span>
         <span class="accent">Movies</span>
       </h1>
-      <a href="index.html" class="btn-link" aria-label="Home">Home</a>
+      <a href="index.html?restore=true" class="btn-link" aria-label="Home">Home</a>
       <a href="auth.html" class="btn-link" aria-label="Account">Account</a>
       <span id="user-badge" class="user-badge" aria-live="polite"></span>
     </header>
@@ -531,7 +531,11 @@
             const title = card.dataset.title || '';
             const year = card.dataset.year ? Number(card.dataset.year) : undefined;
             const id = card.dataset.id ? Number(card.dataset.id) : undefined;
-            await removeCloudMarkByTitleYear('favorite', title, year, id);
+            
+            // 同时更新本地状态和云端状态
+            clearLocalState(title, 'wish'); // 移除本地收藏状态
+            await removeCloudMarkByTitleYear('favorite', title, year, id); // 移除云端收藏状态
+            
             await refreshAll();
           });
         });
@@ -545,7 +549,11 @@
             const title = card.dataset.title || '';
             const year = card.dataset.year ? Number(card.dataset.year) : undefined;
             const id = card.dataset.id ? Number(card.dataset.id) : undefined;
-            await removeCloudMarkByTitleYear('watched', title, year, id);
+            
+            // 同时更新本地状态和云端状态
+            clearLocalState(title, 'seen'); // 移除本地已看状态
+            await removeCloudMarkByTitleYear('watched', title, year, id); // 移除云端已看状态
+            
             await refreshAll();
           });
         });
