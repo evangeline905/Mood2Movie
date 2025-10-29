@@ -86,7 +86,11 @@
       googleBtn.addEventListener('click', async () => {
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
-          options: { redirectTo: `${location.origin}/auth.html` }
+          options: { 
+            redirectTo: window.location.hostname === 'localhost' 
+              ? 'http://localhost:8000/auth.html'
+              : 'https://mood2movie-sandy.vercel.app/auth.html'
+          }
         });
         if (data?.url) window.location.assign(data.url);
         if (error) alert('Google sign-in failed: ' + (error.message || error));
