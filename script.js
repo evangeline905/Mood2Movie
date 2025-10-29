@@ -229,7 +229,9 @@ function updateWishLabel(user) {
     if (!wishLabelEl) return;
     if (user) {
       const name = user.user_metadata?.full_name || user.email || user.id;
-      wishLabelEl.textContent = `${name}, ${DEFAULT_WISH_LABEL}`;
+      // 当有用户名时，将"Describe"改为"describe"
+      const personalizedLabel = DEFAULT_WISH_LABEL.replace('Describe', 'describe');
+      wishLabelEl.textContent = `${name}, ${personalizedLabel}`;
     } else {
       wishLabelEl.textContent = DEFAULT_WISH_LABEL;
     }
