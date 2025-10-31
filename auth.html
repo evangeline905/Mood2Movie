@@ -67,7 +67,7 @@
 
       async function refreshUser() {
         try {
-          // 使用手动管理的会话数据
+          // Use manually managed session data
           const storedSession = localStorage.getItem('supabase.auth.token');
           if (storedSession) {
             const sessionData = JSON.parse(storedSession);
@@ -82,7 +82,7 @@
         }
       }
 
-      // 触发登录
+      // Trigger login
       googleBtn.addEventListener('click', async () => {
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
@@ -96,18 +96,18 @@
         if (error) alert('Google sign-in failed: ' + (error.message || error));
       });
 
-      // 登出
+      // Sign out
       signOutBtn.addEventListener('click', async () => {
         try { 
           await supabase.auth.signOut();
-          // 清除手动管理的会话数据
+          // Clear manually managed session data
           localStorage.removeItem('supabase.auth.token');
         } finally { 
           await refreshUser(); 
         }
       });
 
-      // 从 URL 中提取会话信息
+      // Extract session information from URL
       function extractSessionFromUrl() {
         try {
           const hash = window.location.hash;
@@ -119,7 +119,7 @@
           const expiresIn = urlParams.get('expires_in');
           
           if (accessToken) {
-            // 解析 JWT token 获取用户信息
+            // Parse JWT token to get user information
             const payload = JSON.parse(atob(accessToken.split('.')[1]));
             const user = {
               id: payload.sub,
@@ -147,19 +147,19 @@
         }
       }
 
-      // 检查是否是登录回调
+      // Check if this is a login callback
       const hasAuthParams = window.location.hash.includes('access_token=') || 
                            window.location.search.includes('access_token=');
       
       if (hasAuthParams) {
         console.log('Detected auth callback, processing...');
-        // 从 URL 中提取会话信息
+        // Extract session information from URL
         const sess = extractSessionFromUrl();
         if (sess?.user) {
           console.log('Login successful for:', sess.user.email);
           who.textContent = `Signed in as ${sess.user.email}`;
           
-          // 手动保存会话到 localStorage
+          // Manually save session to localStorage
           try {
             const sessionData = {
               access_token: sess.access_token,
@@ -177,10 +177,10 @@
             localStorage.setItem('supabase.auth.token', JSON.stringify(sessionData));
             console.log('Session manually saved to localStorage');
             
-            // 等待一下确保存储完成
+            // Wait a bit to ensure storage completes
             await new Promise(r => setTimeout(r, 1000));
             
-            // 验证存储
+            // Verify storage
             const stored = localStorage.getItem('supabase.auth.token');
             if (stored) {
               const parsed = JSON.parse(stored);
@@ -203,7 +203,7 @@
           who.textContent = 'Login failed - please try again';
         }
       } else {
-        // 不是登录回调，检查当前登录状态
+        // Not a login callback, check current login state
         const { data } = await supabase.auth.getSession();
         if (data?.session?.user) {
           who.textContent = `Signed in as ${data.session.user.email || data.session.user.id}`;
@@ -211,10 +211,10 @@
       }
 
 
-        // 不监听 Supabase 的认证状态变化，我们手动管理
+        // Do not listen to Supabase auth state changes, we manage manually
         // supabase.auth.onAuthStateChange(async () => { await refreshUser(); });
 
-        // 初始刷新显示
+        // Initial refresh display
         refreshUser();
     </script>
   </body>

@@ -110,14 +110,14 @@
 
     <script type="module" src="debug.js"></script>
 
-    <!-- ✅ Supabase 统一域名 + 登录状态控制 -->
+    <!-- Supabase unified domain + login state control -->
     <script type="module">
       import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.6/+esm';
 
       const SUPABASE_URL = 'https://emnvezsluaulmnoitrle.supabase.co';
       const SUPABASE_ANON_KEY = 'sb_publishable_8MCFTES3t64IIOhQScgy5A_bcaaWYdL';
 
-      // 禁用 Supabase 的自动会话管理，我们手动管理
+      // Disable Supabase automatic session management, we manage manually
       const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: {
           persistSession: false,
@@ -148,7 +148,7 @@
           if (!wishLabelEl) return;
           if (user) {
             const name = user.user_metadata?.full_name || user.email || user.id;
-            // 当有用户名时，将"Describe"改为"describe"
+            // When username is present, change "Describe" to "describe"
             const personalizedLabel = DEFAULT_WISH_LABEL.replace('Describe', 'describe');
             wishLabelEl.textContent = `${name}, ${personalizedLabel}`;
           } else {
@@ -159,14 +159,14 @@
 
       async function updateUI() {
         try {
-          // 首先尝试从 localStorage 恢复会话
+          // First try to restore session from localStorage
           const storedSession = localStorage.getItem('supabase.auth.token');
           if (storedSession) {
             try {
               const sessionData = JSON.parse(storedSession);
               console.log('Found stored session for:', sessionData.user?.email);
               
-              // 检查会话是否过期
+              // Check if session is expired
               if (sessionData.expires_at) {
                 const expiresAt = new Date(sessionData.expires_at * 1000);
                 const now = new Date();
@@ -176,7 +176,7 @@
                   console.log('Session is valid, using stored session');
                   badge.textContent = sessionData.user.user_metadata?.full_name || sessionData.user.email || sessionData.user.id;
                   setMyMoviesEnabled(true);
-                  // 更新标签显示用户名
+                  // Update label to show username
                   updateWishLabel(sessionData.user);
                   return;
                 } else {
@@ -187,7 +187,7 @@
                 console.log('No expiration time, using stored session');
                 badge.textContent = sessionData.user.user_metadata?.full_name || sessionData.user.email || sessionData.user.id;
                 setMyMoviesEnabled(true);
-                // 更新标签显示用户名
+                // Update label to show username
                 updateWishLabel(sessionData.user);
                 return;
               }
@@ -197,22 +197,22 @@
             }
           }
           
-          // 如果没有存储的会话或已过期，显示未登录状态
+          // If no stored session or expired, show not signed in state
           console.log('No valid stored session found');
           badge.textContent = 'Not signed in';
           setMyMoviesEnabled(false);
-          // 更新标签为默认状态
+          // Update label to default state
           updateWishLabel(null);
         } catch (error) {
           console.error('Error checking session:', error);
           badge.textContent = 'Not signed in';
           setMyMoviesEnabled(false);
-          // 更新标签为默认状态
+          // Update label to default state
           updateWishLabel(null);
         }
       }
 
-      // 调试函数：打印会话状态
+      // Debug function: print session state
       async function debugSession(prefix = '') {
         try {
           const { data } = await supabase.auth.getSession();
@@ -227,7 +227,7 @@
         }
       }
 
-      // 尝试从 localStorage 恢复会话
+      // Try to restore session from localStorage
       async function restoreSession() {
         try {
           const storedSession = localStorage.getItem('supabase.auth.token');
@@ -235,7 +235,7 @@
             const sessionData = JSON.parse(storedSession);
             console.log('Found stored session for:', sessionData.user?.email);
             
-            // 刷新会话
+            // Refresh session
             const { data: { session }, error } = await supabase.auth.getSession();
             if (error) throw error;
             
@@ -253,17 +253,17 @@
         }
       }
 
-      // 初始化会话
+      // Initialize session
       async function initSession() {
         try {
-          // 先尝试恢复存储的会话
+          // First try to restore stored session
           const restored = await restoreSession();
           if (restored) {
             console.log('Session restored successfully');
             return;
           }
 
-          // 如果没有存储的会话，检查当前会话
+          // If no stored session, check current session
           const { data: { session }, error } = await supabase.auth.getSession();
           if (error) throw error;
           
@@ -272,7 +272,7 @@
             badge.textContent = session.user.email;
             setMyMoviesEnabled(true);
             
-            // 保存会话信息
+            // Save session information
             const sessionData = {
               user: session.user,
               access_token: session.access_token,
@@ -292,16 +292,16 @@
         }
       }
 
-      // 完全禁用 Supabase 的认证状态监听器
+      // Completely disable Supabase auth state listener
       // supabase.auth.onAuthStateChange(async (event, session) => {
       //   console.log('Auth state changed:', event, session?.user?.email);
       //   
       //   if (session?.user) {
-      //     // 更新 UI
+      //     // Update UI
       //     badge.textContent = session.user.email;
       //     setMyMoviesEnabled(true);
       //     
-      //     // 保存会话信息
+      //     // Save session information
       //     const sessionData = {
       //       user: session.user,
       //       access_token: session.access_token,
@@ -316,10 +316,10 @@
       //   }
       // });
 
-      // 初始化
+      // Initialize
       await updateUI();
       
-      // 不监听 Supabase 的认证状态变化，我们手动管理
+      // Do not listen to Supabase auth state changes, we manage manually
       // supabase.auth.onAuthStateChange(updateUI);
     </script>
 

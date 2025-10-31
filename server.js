@@ -9,10 +9,10 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// 静态托管前端
+// Static hosting for frontend
 app.use(express.static(__dirname));
 
-// 反向代理到 Supabase，同源路径 /supabase
+// Reverse proxy to Supabase, same-origin path /supabase
 const SUPABASE_TARGET = 'https://emnvezsluaulmnoitrle.supabase.co';
 const supabaseProxy = createProxyMiddleware({
   target: SUPABASE_TARGET,
@@ -24,13 +24,13 @@ const supabaseProxy = createProxyMiddleware({
     '^/supabase': '',
   },
   onProxyReq(proxyReq, req, res) {
-    // 保持 Host/Origin 等头部以获得最少跨源影响
-    // （changeOrigin 已处理大部分情况）
+    // Keep Host/Origin headers for minimal cross-origin impact
+    // (changeOrigin handles most cases)
   },
 });
 app.use('/supabase', supabaseProxy);
 
-// 创建 HTTP 服务器并挂载 WebSocket 升级事件
+// Create HTTP server and mount WebSocket upgrade event
 const server = http.createServer(app);
 server.on('upgrade', supabaseProxy.upgrade);
 

@@ -35,9 +35,9 @@ function hideGenQuotes() {
   try { if (genQuotesEl) genQuotesEl.hidden = true; } catch {}
 }
 function applyMarqueeOnce() {
-  // 重置动画以便重新播放
+  // Reset animation to replay
   genQuoteEl.style.animation = 'none';
-  // 触发重绘
+  // Trigger repaint
   void genQuoteEl.offsetWidth;
   genQuoteEl.style.animation = 'gen-marquee 8s linear forwards';
 }
@@ -49,7 +49,7 @@ function startGenQuotes() {
     genQuoteEl.textContent = GEN_QUOTES[idx];
     applyMarqueeOnce();
   };
-  // 移除旧的监听以免重复绑定
+  // Remove old listener to avoid duplicate binding
   try { if (genQuoteEndHandler) genQuoteEl.removeEventListener('animationend', genQuoteEndHandler); } catch {}
   genQuoteEndHandler = () => { next(); };
   genQuoteEl.addEventListener('animationend', genQuoteEndHandler);
@@ -59,7 +59,7 @@ function startGenQuotes() {
 function stopGenQuotes() {
   try { clearInterval(genQuoteTimer); } catch {}
   genQuoteTimer = null;
-  // 停止动画并移除监听
+  // Stop animation and remove listener
   try {
     genQuoteEl.style.animation = 'none';
     if (genQuoteEndHandler) genQuoteEl.removeEventListener('animationend', genQuoteEndHandler);
@@ -70,9 +70,9 @@ function stopGenQuotes() {
 
 let controller = null;
 let session = null;
-// 标记是否曾经有过有效会话，用于避免初始化时的误报"Signed out"
+// Flag if there was ever a valid session, to avoid false "Signed out" reports during initialization
 let hadAuthSession = false;
-// 标记是否正在生成推荐，防止恢复逻辑干扰
+// Flag if currently generating recommendations, to prevent restore logic interference
 let isGenerating = false;
 
 // Supabase client (injected in index.html)
@@ -93,7 +93,7 @@ async function upsertMovieToCloud(item, poster) {
   try {
     if (!supabase) return null;
     const uid = await getSupabaseUserId();
-    if (!uid) return null; // 需要登录后才写入云端
+    if (!uid) return null; // Requires login before writing to cloud
     const payload = {
       title: (item.title || '').trim(),
       year: item.year || null,
@@ -124,7 +124,7 @@ async function setFavoriteMarkInCloud(item, poster) {
       return false;
     }
     
-    // 测试模式跳过云端操作
+    // Test mode skips cloud operations
     if (uid === 'test-user-123') {
       console.log('Test mode: Skipping cloud sync for favorite');
       return true;
@@ -229,7 +229,7 @@ function updateWishLabel(user) {
     if (!wishLabelEl) return;
     if (user) {
       const name = user.user_metadata?.full_name || user.email || user.id;
-      // 当有用户名时，将"Describe"改为"describe"
+      // When username is present, change "Describe" to "describe"
       const personalizedLabel = DEFAULT_WISH_LABEL.replace('Describe', 'describe');
       wishLabelEl.textContent = `${name}, ${personalizedLabel}`;
     } else {
@@ -257,7 +257,7 @@ async function updateUserBadge() {
 function updateAuthNav(user) {
   try {
     if (!accountLink) return;
-    // 始终保持为“Account”链接到账号页，避免误触导致登出
+    // Always keep as "Account" linking to account page, avoid accidental logout
     accountLink.textContent = 'Account';
     accountLink.setAttribute('aria-label', 'Account');
     accountLink.href = 'auth.html';
@@ -265,7 +265,7 @@ function updateAuthNav(user) {
   } catch {}
 }
 
-// 禁用 Supabase 的认证状态监听器，我们手动管理会话
+// Disable Supabase auth state listener, we manage session manually
 // if (supabase && supabase.auth) {
 //   try {
 //     let signedOutTimer = null;
@@ -280,9 +280,9 @@ function updateAuthNav(user) {
 //       } catch {}
 //     }
 //     supabase.auth.onAuthStateChange(async (event, sess) => {
-//       // 记录是否曾出现有效会话
+//       // Flag if there was ever a valid session
 //       try { hadAuthSession = hadAuthSession || !!(sess && sess.user); } catch {}
-//       // 记录日志
+//       // Log event
 //       try { logAuthEvent(event, sess); } catch {}
 //       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
 //         await updateUserBadge();
@@ -300,7 +300,7 @@ function updateAuthNav(user) {
 //           } catch {}
 //         }
 //       } else if (event === 'SIGNED_OUT') {
-//         // 去抖处理，避免导航或初始化期间的误报
+//         // Debounce handling, avoid false reports during navigation or initialization
 //         try { if (signedOutTimer) clearTimeout(signedOutTimer); } catch {}
 //         if (hadAuthSession) {
 //           signedOutTimer = setTimeout(async () => {
@@ -330,7 +330,7 @@ function updateAuthNav(user) {
 // }
 
 // TMDB credentials (can be overridden via window.TMDB_READ_TOKEN / window.TMDB_API_KEY)
-// 注意：在生产环境中，这些密钥应该通过环境变量或服务器端API提供
+// Note: In production, these keys should be provided via environment variables or server-side API
 const TMDB_READ_TOKEN = window.TMDB_READ_TOKEN || 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIxYjMzODhiMTFiMWM4NjI3ZmZlMWU2OTAxYTg4OWM0ZiIsIm5iZiI6MTc2MDIwODY4My40NTIsInN1YiI6IjY4ZWFhNzJiOGY3OTNkZTRlNzFmNjczMiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.ijIF_j2ZesTQNkmgfzogTL0y1DBLUFQ-CfVBSErxPZQ';
 const TMDB_API_KEY = window.TMDB_API_KEY || '1b3388b11b1c8627ffe1e6901a889c4f';
 
@@ -338,7 +338,7 @@ chips.addEventListener('click', (e) => {
   const t = e.target;
   if (t.classList.contains('chip')) {
     const text = t.textContent.trim();
-    textarea.value = text; // 直接替换，而不是追加
+    textarea.value = text; // Direct replacement, not append
     textarea.focus();
   }
 });
@@ -363,7 +363,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     console.log('DOM loaded, checking if should restore items...');
     
-    // 检查是否应该恢复推荐
+    // Check if should restore recommendations
     const urlParams = new URLSearchParams(window.location.search);
     const shouldRestore = urlParams.get('restore') === 'true';
     const isFromOtherPage = document.referrer && document.referrer.includes(window.location.hostname);
@@ -371,13 +371,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     console.log('Restore check:', { shouldRestore, isFromOtherPage, hasStoredItems });
     
-    // 只有在明确要求恢复或从其他页面返回时才恢复推荐，且不在生成过程中
+    // Only restore recommendations when explicitly requested or returning from other page, and not during generation
     if (!isGenerating && (shouldRestore || (isFromOtherPage && hasStoredItems))) {
       console.log('Restoring items due to navigation...');
       await restoreLastItems();
       console.log('Items restored successfully');
       
-      // 清除URL参数以避免重复恢复
+      // Clear URL parameter to avoid duplicate restore
       if (shouldRestore) {
         const newUrl = new URL(window.location);
         newUrl.searchParams.delete('restore');
@@ -387,7 +387,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.log('Fresh page load, not restoring items');
     }
     
-    // 标记当前会话
+    // Mark current session
     sessionStorage.setItem('m2m_has_session', 'true');
   } catch (error) {
     console.error('Failed to restore items on DOM load:', error);
@@ -413,16 +413,16 @@ window.addEventListener('storage', (e) => {
   }
 });
 
-// 监听页面可见性变化，当从其他页面返回时恢复推荐
+// Listen for page visibility changes, restore recommendations when returning from other page
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
-    // 页面变为可见时，检查是否需要恢复推荐
+    // When page becomes visible, check if should restore recommendations
     const urlParams = new URLSearchParams(window.location.search);
     const shouldRestore = urlParams.get('restore') === 'true';
     const hasStoredItems = localStorage.getItem('m2m_last_items');
     const hasVisibleItems = document.querySelectorAll('.ticket-page').length > 0;
     
-    // 只有在明确要求恢复且没有可见项目且不在生成过程中时才恢复
+    // Only restore when explicitly requested and no visible items and not during generation
     if (!isGenerating && shouldRestore && hasStoredItems && !hasVisibleItems) {
       console.log('Page became visible and restore requested, attempting restore...');
       restoreLastItems().catch(error => {
@@ -435,20 +435,20 @@ document.addEventListener('visibilitychange', () => {
 async function startRecommendation(reroll = false) {
   const content = textarea.value.trim();
   if (!content) {
-    showToast('请先描述你想看的电影，再开始推荐～');
+    showToast('Please describe the movie you want to watch before starting recommendation');
     return;
   }
   
-  // 设置生成标志，防止恢复逻辑干扰
+  // Set generation flag to prevent restore logic interference
   isGenerating = true;
   
-  // 保存用户输入，以便Refresh Batch使用
+  // Save user input for Refresh Batch use
   localStorage.setItem('m2m_last_input', content);
 
   resultsCard.hidden = false;
   setStatus('Checking availability…');
   
-  // 禁用Generate按钮，显示生成中状态
+  // Disable Generate button, show generating state
   goBtn.disabled = true;
   goBtn.textContent = 'Generating...';
   goBtn.classList.add('generating');
@@ -456,7 +456,7 @@ async function startRecommendation(reroll = false) {
   if (!('LanguageModel' in globalThis)) {
     setStatus('API unavailable');
     showToast('Prompt API is disabled. Please enable it in Chrome 138+ (flags).');
-    // 恢复Generate按钮状态
+    // Restore Generate button state
     goBtn.disabled = false;
     goBtn.textContent = 'Generate';
     goBtn.classList.remove('generating');
@@ -467,7 +467,7 @@ async function startRecommendation(reroll = false) {
   setStatus(`Status: ${availability}`);
   if (availability === 'unavailable') {
     showToast('Device or environment does not meet the requirements (disk/memory/GPU).');
-    // 恢复Generate按钮状态
+    // Restore Generate button state
     goBtn.disabled = false;
     goBtn.textContent = 'Generate';
     goBtn.classList.remove('generating');
@@ -475,7 +475,7 @@ async function startRecommendation(reroll = false) {
   }
 
   controller = new AbortController();
-  // 将用户描述当作心情/场景，其余通过全局变量或默认值注入
+  // Use user description as mood/scenario, inject rest via global variables or defaults
   const mood = content;
   window.lastUserMood = mood;
   const lang = (window.USER_LANG || 'English');
@@ -492,20 +492,20 @@ async function startRecommendation(reroll = false) {
   const prevTitlesArr = Array.isArray(window.lastTitles) ? window.lastTitles : [];
   const prevTitles = prevTitlesArr.length ? prevTitlesArr.join(', ') : '';
   
-  // 获取用户已观看的电影标题，避免重复推荐
+  // Get user watched movie titles to avoid duplicate recommendations
   const watchedTitles = getWatchedTitles();
   const watchedTitlesStr = watchedTitles.length ? watchedTitles.join(', ') : '';
   
-         // 如果用户已经观看了某些电影，在prompt中明确禁止推荐
+         // If user has watched certain movies, explicitly forbid recommending them in prompt
          const exclusionRule = watchedTitlesStr ? 
-           `\n\n🚫 ABSOLUTELY FORBIDDEN - DO NOT RECOMMEND ANY OF THESE MOVIES:\n${watchedTitlesStr}\n\n**CRITICAL RULE**: You MUST NOT recommend any movie that matches or is similar to the above list. This includes:\n- Exact title matches\n- Partial title matches\n- Similar sounding titles\n- Movies with similar themes from the same director\n\n**EXCEPTION**: If the user input is a very specific movie title or director name (e.g., "The Godfather", "Christopher Nolan movies"), and that specific movie is in the forbidden list above, you MAY still recommend it if it's a perfect match for the user's request. This overrides the exclusion rule for precise matches only.\n\nIf you see ANY similarity to the forbidden list above (except for precise matches), choose a DIFFERENT movie instead. This is non-negotiable.` : '';
+           `\n\nABSOLUTELY FORBIDDEN - DO NOT RECOMMEND ANY OF THESE MOVIES:\n${watchedTitlesStr}\n\n**CRITICAL RULE**: You MUST NOT recommend any movie that matches or is similar to the above list. This includes:\n- Exact title matches\n- Partial title matches\n- Similar sounding titles\n- Movies with similar themes from the same director\n\n**EXCEPTION**: If the user input is a very specific movie title or director name (e.g., "The Godfather", "Christopher Nolan movies"), and that specific movie is in the forbidden list above, you MAY still recommend it if it's a perfect match for the user's request. This overrides the exclusion rule for precise matches only.\n\nIf you see ANY similarity to the forbidden list above (except for precise matches), choose a DIFFERENT movie instead. This is non-negotiable.` : '';
   try {
     session = await LanguageModel.create({
       signal: controller.signal,
-      language: 'en', // 指定输出语言为英语
+      language: 'en', // Specify output language as English
       initialPrompts: [{
         role: 'system',
-         content: `You are Mood2Movie, a professional AI movie curator. Based on the user's mood, preferences, and region, recommend suitable movies.\n\n**MOST IMPORTANT RULE**: NEVER recommend any movie that the user has already watched. This is the #1 priority.\n\nRequirements:\n1. Output MUST be strict JSON and follow the schema exactly.\n2. Each recommendation is a "movie ticket" with title, short reason, watchability, rating, etc.\n3. Keep the reason short, warm, and spoiler-free.\n4. Do NOT add explanations or extra text; the JSON is the final output.\n5. Output language: English.\n6. If the user mentions titles or genres, prioritize semantically related films. If the user asks for films by a specific director (e.g., "films by the director of [movie name]"), you MUST recommend movies by that exact director.\n7. **CRITICAL REQUIREMENT**: You MUST ALWAYS recommend exactly 3 movies. This is non-negotiable. Never return fewer than 3 movies. If you think there aren't enough movies, you're wrong - there are thousands of movies available. Expand your search criteria, consider similar genres, different decades, international films, or lesser-known gems. ALWAYS find 3 movies.\n8. **IMPORTANT**: If this is a refresh batch (reroll), actively seek out DIFFERENT movies from the previous batch. Explore diverse options within the same theme/genre/director. For example, if previous batch had "Fight Club", try "Se7en", "Gone Girl", "The Social Network", "Zodiac", "The Girl with the Dragon Tattoo", etc.\n9. **CRITICAL**: NEVER recommend movies that the user has already watched. Check the "Already watched movies" list carefully.\n10. **EXCEPTION RULE**: If the user input is a very specific movie title or director name (e.g., "The Godfather", "Christopher Nolan movies"), and that specific movie is in the watched list, you MAY still recommend it if it's a perfect match for the user's request. This overrides the "exclude watched" rule for precise matches only.\n11. **DIRECTOR IDENTIFICATION RULE**: When user asks for "films by the director of [movie name]" or similar requests, you MUST identify the director of that movie and recommend ONLY movies by that specific director. For example:\n    - "films by the director of Cinema Paradiso" → Recommend movies by Giuseppe Tornatore\n    - "movies by the director of Inception" → Recommend movies by Christopher Nolan\n    - "other films by the director of Pulp Fiction" → Recommend movies by Quentin Tarantino\n    - "I want to watch Giuseppe Tornatore's movie" → Recommend ONLY movies by Giuseppe Tornatore\n\n**CRITICAL**: If the user specifies a director name or asks for films by a specific director, ALL recommendations MUST be by that exact director. Do not mix directors or recommend movies by other directors.\n\nOutput format (strict JSON):\n{\n  "recommendations": [\n    {\n      "title": "string(movie title)",\n      "year": "number(release year)",\n      "reason": "string(≤ 40 words)",\n      "genres": ["string"],\n      "rating": "number(0~10)",\n      "runtime": "string(e.g., '102 min')",\n      "country": "string",\n      "availability": "string(e.g., 'Available on Netflix' or 'Disney+')",\n      "poster": "string(poster URL)",\n      "match_score": "number(0~100)",\n      "user_mood": "string(user mood)",\n      "recommendation_id": "string(e.g., 'M2M-{{date}}-001')",\n      "theme_color": "string(e.g., '#EAE0C8')"\n    }\n  ]\n}\n\nContext:\nUser mood: ${mood}\nPreferred language: ${lang}\nLiked titles: ${liked_titles}\nExclude titles: ${excludes}${exclusionRule}\nProviders: ${providers}\nRegion: ${region}${prevTitles ? `\nPrevious batch titles (avoid duplicates): ${prevTitles}` : ''}${reroll ? '\n**THIS IS A REFRESH BATCH - Please recommend EXACTLY 3 DIFFERENT movies from the previous batch while maintaining the same theme/genre/director preference. There are thousands of movies available, so finding 3 different movies should always be possible. Explore diverse options within the same theme.**' : ''}${reroll && prevTitles ? `\n\n🚫 REFRESH BATCH EXCLUSION - DO NOT RECOMMEND ANY OF THESE PREVIOUS RECOMMENDATIONS:\n${prevTitles}\n\n**CRITICAL**: You MUST NOT recommend any movie that matches or is similar to the previous batch titles above. Choose completely different movies while maintaining the same mood/genre preference.` : ''}\n\n**DIRECTOR CHECK**: If the user input mentions a specific director name (like "Giuseppe Tornatore", "Christopher Nolan", "Quentin Tarantino", etc.) or asks for films by a specific director, ALL 3 recommendations MUST be by that exact director. Do not mix directors.\n\n**FINAL REMINDER**: Before outputting any movie title, double-check that it is NOT in the forbidden list above. If you see any similarity, choose a different movie instead.\n\nReturn ONLY the JSON that follows the schema above; no extra text.`,
+         content: `You are Mood2Movie, a professional AI movie curator. Based on the user's mood, preferences, and region, recommend suitable movies.\n\n**MOST IMPORTANT RULE**: NEVER recommend any movie that the user has already watched. This is the #1 priority.\n\nRequirements:\n1. Output MUST be strict JSON and follow the schema exactly.\n2. Each recommendation is a "movie ticket" with title, short reason, watchability, rating, etc.\n3. Keep the reason short, warm, and spoiler-free.\n4. Do NOT add explanations or extra text; the JSON is the final output.\n5. Output language: English.\n6. If the user mentions titles or genres, prioritize semantically related films. If the user asks for films by a specific director (e.g., "films by the director of [movie name]"), you MUST recommend movies by that exact director.\n7. **CRITICAL REQUIREMENT**: You MUST ALWAYS recommend exactly 3 movies. This is non-negotiable. Never return fewer than 3 movies. If you think there aren't enough movies, you're wrong - there are thousands of movies available. Expand your search criteria, consider similar genres, different decades, international films, or lesser-known gems. ALWAYS find 3 movies.\n8. **IMPORTANT**: If this is a refresh batch (reroll), actively seek out DIFFERENT movies from the previous batch. Explore diverse options within the same theme/genre/director. For example, if previous batch had "Fight Club", try "Se7en", "Gone Girl", "The Social Network", "Zodiac", "The Girl with the Dragon Tattoo", etc.\n9. **CRITICAL**: NEVER recommend movies that the user has already watched. Check the "Already watched movies" list carefully.\n10. **EXCEPTION RULE**: If the user input is a very specific movie title or director name (e.g., "The Godfather", "Christopher Nolan movies"), and that specific movie is in the watched list, you MAY still recommend it if it's a perfect match for the user's request. This overrides the "exclude watched" rule for precise matches only.\n11. **DIRECTOR IDENTIFICATION RULE**: When user asks for "films by the director of [movie name]" or similar requests, you MUST identify the director of that movie and recommend ONLY movies by that specific director. For example:\n    - "films by the director of Cinema Paradiso" → Recommend movies by Giuseppe Tornatore\n    - "movies by the director of Inception" → Recommend movies by Christopher Nolan\n    - "other films by the director of Pulp Fiction" → Recommend movies by Quentin Tarantino\n    - "I want to watch Giuseppe Tornatore's movie" → Recommend ONLY movies by Giuseppe Tornatore\n\n**CRITICAL**: If the user specifies a director name or asks for films by a specific director, ALL recommendations MUST be by that exact director. Do not mix directors or recommend movies by other directors.\n\nOutput format (strict JSON):\n{\n  "recommendations": [\n    {\n      "title": "string(movie title)",\n      "year": "number(release year)",\n      "reason": "string(≤ 40 words)",\n      "genres": ["string"],\n      "rating": "number(0~10)",\n      "runtime": "string(e.g., '102 min')",\n      "country": "string",\n      "availability": "string(e.g., 'Available on Netflix' or 'Disney+')",\n      "poster": "string(poster URL)",\n      "match_score": "number(0~100)",\n      "user_mood": "string(user mood)",\n      "recommendation_id": "string(e.g., 'M2M-{{date}}-001')",\n      "theme_color": "string(e.g., '#EAE0C8')"\n    }\n  ]\n}\n\nContext:\nUser mood: ${mood}\nPreferred language: ${lang}\nLiked titles: ${liked_titles}\nExclude titles: ${excludes}${exclusionRule}\nProviders: ${providers}\nRegion: ${region}${prevTitles ? `\nPrevious batch titles (avoid duplicates): ${prevTitles}` : ''}${reroll ? '\n**THIS IS A REFRESH BATCH - Please recommend EXACTLY 3 DIFFERENT movies from the previous batch while maintaining the same theme/genre/director preference. There are thousands of movies available, so finding 3 different movies should always be possible. Explore diverse options within the same theme.**' : ''}${reroll && prevTitles ? `\n\nREFRESH BATCH EXCLUSION - DO NOT RECOMMEND ANY OF THESE PREVIOUS RECOMMENDATIONS:\n${prevTitles}\n\n**CRITICAL**: You MUST NOT recommend any movie that matches or is similar to the previous batch titles above. Choose completely different movies while maintaining the same mood/genre preference.` : ''}\n\n**DIRECTOR CHECK**: If the user input mentions a specific director name (like "Giuseppe Tornatore", "Christopher Nolan", "Quentin Tarantino", etc.) or asks for films by a specific director, ALL 3 recommendations MUST be by that exact director. Do not mix directors.\n\n**FINAL REMINDER**: Before outputting any movie title, double-check that it is NOT in the forbidden list above. If you see any similarity, choose a different movie instead.\n\nReturn ONLY the JSON that follows the schema above; no extra text.`,
       }],
       monitor(m) {
         downloadEl.hidden = false;
@@ -536,7 +536,7 @@ async function startRecommendation(reroll = false) {
     let finalText = '';
     for await (const chunk of stream) {
       hasStreamOutput = true;
-      // 兼容不同流事件：output_text_delta（增量）与 output_text（完整）
+      // Compatible with different stream events: output_text_delta (incremental) and output_text (complete)
       let piece = '';
       if (typeof chunk === 'string') {
         piece = chunk;
@@ -546,14 +546,14 @@ async function startRecommendation(reroll = false) {
         finalText += piece;
       } else if (chunk?.type === 'output_text') {
         piece = chunk.text ?? '';
-        finalText = piece; // 将完整文本覆盖为最终结果
+        finalText = piece; // Overwrite complete text as final result
       } else {
         piece = chunk?.text ?? '';
         finalText += piece;
       }
       resultEl.textContent = finalText || piece;
     }
-    // 兜底：若流式没有内容，改用非流式一次性获取结果
+    // Fallback: if stream has no content, use non-streaming one-time fetch
     if (!hasStreamOutput || !resultEl.textContent) {
       const final = await session.prompt(promptText);
       const text = typeof final === 'string'
@@ -562,10 +562,10 @@ async function startRecommendation(reroll = false) {
       resultEl.textContent = text;
       finalText = text;
     }
-    // 解析并渲染卡片（优先解析 JSON）
+    // Parse and render cards (prefer JSON parsing)
     let parsed = parseJsonRecommendations(finalText) || parseRecommendations(finalText);
     let items = Array.isArray(parsed?.recommendations) ? parsed.recommendations : parsed;
-    // 若流式文本难以解析，使用一次性 prompt 兜底
+    // If streaming text is hard to parse, use one-time prompt as fallback
     if (!items || items.length === 0) {
       const final = await session.prompt(promptText);
       const text = typeof final === 'string' ? final : (final?.text ?? JSON.stringify(final));
@@ -576,7 +576,7 @@ async function startRecommendation(reroll = false) {
     }
     console.log('AI generated items:', items?.length || 0, items);
     
-    // 如果AI没有生成3部电影，记录警告并尝试重新生成
+    // If AI didn't generate 3 movies, log warning and try to regenerate
     if (!items || items.length < 3) {
       console.warn('AI generated', items?.length || 0, 'movies instead of 3');
       console.warn('This might be due to:', {
@@ -586,7 +586,7 @@ async function startRecommendation(reroll = false) {
         reroll: reroll
       });
       
-      // 如果电影数量不足，尝试重新生成一次
+      // If movie count is insufficient, try regenerating once
       if (items && items.length > 0 && items.length < 3) {
         console.log('Attempting to generate additional movies...');
         const neededCount = 3 - items.length;
@@ -603,7 +603,7 @@ async function startRecommendation(reroll = false) {
           console.log('Parsed additional items:', additionalItems);
           
           if (additionalItems && additionalItems.length > 0) {
-            // 合并结果，避免重复
+            // Merge results, avoid duplicates
             const existingTitles = new Set(items.map(item => item.title?.toLowerCase()));
             const newItems = additionalItems.filter(item => 
               item.title && !existingTitles.has(item.title.toLowerCase())
@@ -619,13 +619,13 @@ async function startRecommendation(reroll = false) {
       }
     }
     
-    // 过滤掉已观看的电影（AI提示已经处理，这里只是额外保险）
+    // Filter out watched movies (AI prompt already handled, this is extra insurance)
     const watchedTitles = getWatchedTitles();
     console.log('Watched titles to filter:', watchedTitles);
     const filtered = (items || []).filter(item => {
       const title = item.title || '';
       const isWatched = watchedTitles.some(watchedTitle => {
-        // 检查标题是否匹配或相似
+        // Check if title matches or is similar
         return title.toLowerCase().includes(watchedTitle.toLowerCase()) || 
                watchedTitle.toLowerCase().includes(title.toLowerCase());
       });
@@ -636,7 +636,7 @@ async function startRecommendation(reroll = false) {
     });
     console.log('After filtering watched movies:', filtered.length, filtered.map(f => f.title));
     
-    // 如果是Refresh Batch，还要过滤掉上一批推荐过的电影（AI提示已经处理，这里只是额外保险）
+    // If Refresh Batch, also filter out movies recommended in previous batch (AI prompt already handled, this is extra insurance)
     let finalFiltered = filtered;
     if (reroll && window.lastTitles && window.lastTitles.length > 0) {
       console.log('Refresh Batch: Filtering out previous recommendations:', window.lastTitles);
@@ -655,11 +655,11 @@ async function startRecommendation(reroll = false) {
       console.log('After filtering duplicates:', finalFiltered.length, 'movies remaining');
     }
     
-    // 如果过滤后仍然不足3部电影，尝试重新生成
+    // If still less than 3 movies after filtering, try regenerating
     let finalItems = finalFiltered.slice(0, 3);
     console.log('Final items count after filtering:', finalItems.length);
     
-    // 如果最终结果不足3部电影，强制重新生成
+    // If final result still less than 3 movies, force regenerate
     if (finalItems.length < 3) {
       console.warn('CRITICAL: Only', finalItems.length, 'movies after filtering. Attempting emergency regeneration...');
       try {
@@ -675,7 +675,7 @@ async function startRecommendation(reroll = false) {
         console.log('Emergency parsed items:', emergencyItems);
         
         if (emergencyItems && emergencyItems.length > 0) {
-          // 合并结果
+          // Merge results
           const existingTitles = new Set(finalItems.map(item => item.title?.toLowerCase()));
           const newEmergencyItems = emergencyItems.filter(item => 
             item.title && !existingTitles.has(item.title.toLowerCase())
@@ -690,7 +690,7 @@ async function startRecommendation(reroll = false) {
     
     console.log('Final items count:', finalItems.length);
     
-    // 为每部电影生成并保存完整的描述内容
+    // Generate and save complete description content for each movie
     for (const item of finalItems) {
       if (!item.emotionLine) {
         item.emotionLine = await buildEmotionLine(window.lastUserMood || '', item);
@@ -702,35 +702,35 @@ async function startRecommendation(reroll = false) {
       }
     }
     
-    // 直接显示最终的电影列表
+    // Directly display final movie list
     console.log('Final items to render:', finalItems.length, finalItems);
     renderCards(finalItems);
     try { saveLastItems(finalItems); } catch {}
     window.lastTitles = finalItems.map(it => it.title).filter(Boolean);
     countEl.textContent = finalItems.length ? `Total ${finalItems.length}` : '';
-    // 若无法解析为卡片，则直接展示文本内容
+    // If cannot parse as cards, directly show text content
     resultEl.hidden = !!finalItems.length;
     if (!finalItems.length) {
       resultEl.textContent = finalText || 'No recommendations found.';
     }
     setStatus('Done');
     stopGenQuotes();
-    // 恢复Generate按钮状态
+    // Restore Generate button state
     goBtn.disabled = false;
     goBtn.textContent = 'Generate';
     goBtn.classList.remove('generating');
-    // 清除生成标志
+    // Clear generation flag
     isGenerating = false;
   } catch (err) {
     console.error(err);
     setStatus('Error');
     stopGenQuotes();
     showToast('Generation failed: ' + err.message);
-    // 恢复Generate按钮状态
+    // Restore Generate button state
     goBtn.disabled = false;
     goBtn.textContent = 'Generate';
     goBtn.classList.remove('generating');
-    // 清除生成标志
+    // Clear generation flag
     isGenerating = false;
   }
 }
@@ -738,12 +738,12 @@ async function startRecommendation(reroll = false) {
 function refreshRecommendations() {
   const content = textarea.value.trim();
   if (!content) {
-    // 如果没有输入内容，尝试使用上次的输入或默认描述
+    // If no input content, try using last input or default description
     const lastInput = localStorage.getItem('m2m_last_input') || 'I want to watch a good movie';
     textarea.value = lastInput;
     showToast('Using previous input to generate new batch...');
   } else {
-    // 保存当前输入，以便下次使用
+    // Save current input for next use
     localStorage.setItem('m2m_last_input', content);
   }
   setStatus('Refreshing batch…');
@@ -792,11 +792,11 @@ async function restoreLastItems() {
   }
 }
 
-// 优先解析严格 JSON 数组
+// Prefer parsing strict JSON array
 function parseJsonRecommendations(text) {
   if (!text) return null;
   try {
-    // 提取最外层 JSON（对象/数组），兼容模型在前后添加噪音的情况
+    // Extract outermost JSON (object/array), compatible with model adding noise before/after
     const objStart = text.indexOf('{');
     const objEnd = text.lastIndexOf('}');
     const arrStart = text.indexOf('[');
@@ -811,11 +811,11 @@ function parseJsonRecommendations(text) {
     }
 
     const parsed = JSON.parse(raw);
-    // 若是数组，则视为 recommendations
+    // If array, treat as recommendations
     if (Array.isArray(parsed)) {
       return { recommendations: normalizeMood2MovieItems(parsed) };
     }
-    // 若是对象，尝试常见字段：recommendations / items / data / list
+    // If object, try common fields: recommendations / items / data / list
     if (parsed && (Array.isArray(parsed.recommendations) || Array.isArray(parsed.items) || Array.isArray(parsed.data) || Array.isArray(parsed.list))) {
       const arr = parsed.recommendations || parsed.items || parsed.data || parsed.list || [];
       return { recommendations: normalizeMood2MovieItems(arr) };
@@ -836,7 +836,7 @@ function normalizeMood2MovieItems(arr) {
   };
   const sanitizeUrl = (s) => {
     const t = String(s || '').trim();
-    // 去除包裹的反引号或引号，兼容 Markdown 代码样式
+    // Remove wrapping backticks or quotes, compatible with Markdown code style
     const cleaned = t.replace(/^[`'"\s]+|[`'"\s]+$/g, '');
     return cleaned;
   };
@@ -851,7 +851,7 @@ function normalizeMood2MovieItems(arr) {
   };
   const parseTitleFromReason = (reason) => {
     if (!reason) return '';
-    // 《片名》 或 "片名" 或 '片名'
+    // Match movie title in Chinese brackets 《》 or quotes "" or ''
     const m = reason.match(/《([^》]+)》|"([^"]+)"|'([^']+)'/);
     return (m?.[1] || m?.[2] || m?.[3] || '').trim();
   };
@@ -859,21 +859,21 @@ function normalizeMood2MovieItems(arr) {
   return arr
     .filter(it => it && typeof it === 'object')
     .map(it => {
-      // 标题兜底：尝试多种字段与从 reason 中提取
+      // Title fallback: try multiple fields and extract from reason
       let title = pickStr(it, ['title', 'name', 'movie_title', 'movie', 'film_title', 'original_title', 'cn_title', 'zh_title']);
       const reason = pickStr(it, ['reason', 'why', 'summary', 'description', 'explanation']);
       if (!title || title === '...' || title === '…') {
         const fromReason = parseTitleFromReason(reason);
         if (fromReason) title = fromReason;
       }
-      if (!title) title = '未命名影片';
+      if (!title) title = 'Untitled Movie';
 
-      // 规范化：去掉标题末尾的括号年份，例如 "Knives Out (2019)"
+      // Normalize: remove year in parentheses at end of title, e.g. "Knives Out (2019)"
       const yearFromTitleMatch = String(title).match(/\((\d{4})\)\s*$/);
       const yearFromTitle = yearFromTitleMatch ? Number(yearFromTitleMatch[1]) : undefined;
       title = String(title).replace(/\s*\((\d{4})\)\s*$/, '');
 
-      // 体裁标签：数组或分隔字符串
+      // Genre tags: array or delimited string
       let genres = Array.isArray(it.genres) ? it.genres : (it.tags || it.category || it.categories);
       if (typeof genres === 'string') {
         genres = genres.split(/[、，,|\s]+/).filter(Boolean);
@@ -900,7 +900,7 @@ function normalizeMood2MovieItems(arr) {
     .filter(it => (it.title || '').trim());
 }
 
-// 将推荐文本解析为结构化数据
+// Parse recommendation text into structured data
 function parseRecommendations(text) {
   if (!text) return [];
   const lines = text
@@ -910,7 +910,7 @@ function parseRecommendations(text) {
     .slice(0, 3);
   const items = [];
   for (const l of lines) {
-    // 预期格式：片名 — 简短理由（可选括号年份/评分）
+    // Expected format: title — short reason (optional year/rating in parentheses)
     const [left, reason = ''] = l.split(/\s*[—\-]\s*/);
     if (!left) continue;
     const m = left.match(/^(.*?)(?:\((\d{4})\))?(?:\s*\|\s*(\d+(?:\.\d+)?))?$/);
@@ -922,17 +922,17 @@ function parseRecommendations(text) {
   return items;
 }
 
-// 获取海报（优先 TMDB；其次 OMDb；最后占位图）
+// Get poster (prefer TMDB; then OMDb; finally placeholder)
 const _posterCache = new Map();
 
-// TMDB条款要求：缓存不超过6个月
-const TMDB_CACHE_DURATION = 6 * 30 * 24 * 60 * 60 * 1000; // 6个月（毫秒）
+// TMDB terms require: cache no more than 6 months
+const TMDB_CACHE_DURATION = 6 * 30 * 24 * 60 * 60 * 1000; // 6 months (milliseconds)
 
 function isCacheExpired(timestamp) {
   return Date.now() - timestamp > TMDB_CACHE_DURATION;
 }
 
-// 清理过期的海报缓存
+// Clean expired poster cache
 function cleanExpiredPosterCache() {
   const now = Date.now();
   for (const [key, data] of _posterCache.entries()) {
@@ -942,13 +942,13 @@ function cleanExpiredPosterCache() {
   }
 }
 
-// 定期清理过期缓存（每小时检查一次）
+// Periodically clean expired cache (check once per hour)
 setInterval(cleanExpiredPosterCache, 60 * 60 * 1000);
 async function getTmdbPoster(title, year) {
   try {
     if (!TMDB_READ_TOKEN && !TMDB_API_KEY) return '';
     
-    // 清理标题，移除常见的干扰词
+    // Clean title, remove common noise words
     const cleanTitle = title.replace(/\s*\([^)]*\)\s*$/, '').trim();
     
     const url = new URL('https://api.themoviedb.org/3/search/movie');
@@ -972,9 +972,9 @@ async function getTmdbPoster(title, year) {
     const data = await res.json();
     console.log('TMDB response:', { results: data?.results?.length || 0, query: cleanTitle });
     
-    // 尝试找到最佳匹配
+    // Try to find best match
     if (data?.results && data.results.length > 0) {
-      // 优先选择有海报的结果
+      // Prefer results with poster
       const withPoster = data.results.filter(movie => movie.poster_path);
       const bestMatch = withPoster.length > 0 ? withPoster[0] : data.results[0];
       
@@ -1012,13 +1012,13 @@ async function getOmdbPoster(title, year) {
 async function getPosterUrl(title, year, candidate, genres = []) {
   const key = `poster-${title}-${year ?? ''}`;
   
-  // 检查缓存是否存在且未过期
+  // Check if cache exists and not expired
   if (_posterCache.has(key)) {
     const cachedData = _posterCache.get(key);
     if (cachedData.timestamp && !isCacheExpired(cachedData.timestamp)) {
       return cachedData.url;
     } else {
-      // 缓存过期，删除旧缓存
+      // Cache expired, delete old cache
       _posterCache.delete(key);
     }
   }
@@ -1026,7 +1026,7 @@ async function getPosterUrl(title, year, candidate, genres = []) {
   const picsum = `https://image.tmdb.org/t/p/w500`; // placeholder prefix for tmdb; we'll fallback to picsum next
   // 1) Try TMDB
   let poster = await getTmdbPoster(title, year);
-  // 若 TMDB 未找到且提供了候选链接，需校验候选是否为有效 URL
+  // If TMDB not found and candidate link provided, validate if candidate is valid URL
   const isValidUrl = (u) => {
     const s = String(u || '').trim();
     return /^(https?:|data:|blob:)/i.test(s);
@@ -1034,9 +1034,9 @@ async function getPosterUrl(title, year, candidate, genres = []) {
   if (!poster && candidate && isValidUrl(candidate)) poster = candidate.trim();
   // 2) Fallback OMDb
   if (!poster) poster = await getOmdbPoster(title, year);
-  // 3) Final fallback - 使用电影主题的占位图
+  // 3) Final fallback - use movie theme placeholder
   if (!poster) {
-    // 根据电影类型生成不同的占位图
+    // Generate different placeholder based on movie type
     const genre = Array.isArray(genres) && genres.length > 0 ? genres[0].toLowerCase() : '';
     let placeholderType = 'movie';
     
@@ -1049,7 +1049,7 @@ async function getPosterUrl(title, year, candidate, genres = []) {
     poster = `https://via.placeholder.com/300x450/2c3e50/ffffff?text=${encodeURIComponent(title)}`;
   }
   
-  // 存储到缓存，包含时间戳
+  // Store to cache, include timestamp
   _posterCache.set(key, {
     url: poster,
     timestamp: Date.now()
@@ -1062,7 +1062,7 @@ function placeholderPoster(title) {
   return `https://picsum.photos/seed/${encodeURIComponent(title)}/300/450`;
 }
 
-// 渲染卡片列表
+// Render card list
 function shortMood(mood) {
   const m = String(mood || '').trim();
   if (!m) return 'Matches your current mood';
@@ -1157,7 +1157,7 @@ function cleanReason(reason) {
   // Remove common trailing meta fragments if still present
   r = r.replace(/\bApprox\.\s*rating\s*\d+(?:\.\d+)?\b/i, '').trim();
   r = r.replace(/\b\d{4}\b.*$/i, '').trim(); // drop year and after if appended
-  r = r.replace(/\b\d{2,3}\s*(?:min|分钟)\b.*$/i, '').trim();
+  r = r.replace(/\b\d{2,3}\s*(?:min|minutes)\b.*$/i, '').trim();
   // Remove dangling separators
   r = r.replace(/[·/\-]+\s*$/, '').trim();
   return r;
@@ -1207,7 +1207,7 @@ function extractMinutes(runtime) {
   return Number.isFinite(num) ? String(num) : '';
 }
 
-// Persist user actions (favorite / watched) — allow both marks to coexist
+// Persist user actions (favorite / watched) - allow both marks to coexist
 function normalizeStates(raw) {
   const out = {};
   try {
@@ -1244,24 +1244,24 @@ function getWatchedTitles() {
   const watchedTitles = Object.entries(s)
     .filter(([_, v]) => v === 'seen' || (v && typeof v === 'object' && v.watched))
     .map(([title, v]) => {
-      // 如果有完整的电影信息，使用存储的标题，否则使用键名
+      // If has complete movie info, use stored title, otherwise use key name
       if (v && typeof v === 'object' && v.watched && v.title) {
         return v.title;
       }
       return title;
     });
   
-  // 添加部分匹配的标题（处理 "Paddington" vs "Paddington 2" 的情况）
+  // Add partial match titles (handle "Paddington" vs "Paddington 2" cases)
   const expandedTitles = new Set(watchedTitles);
   watchedTitles.forEach(title => {
-    // 如果标题包含数字，也添加不带数字的版本
+    // If title contains number, also add version without number
     const withoutNumber = title.replace(/\s+\d+$/, '');
     if (withoutNumber !== title) {
       expandedTitles.add(withoutNumber);
     }
-    // 如果标题不包含数字，也添加带数字的版本
+    // If title doesn't contain number, also add versions with number
     else {
-      // 添加常见的续集版本
+      // Add common sequel versions
       for (let i = 2; i <= 5; i++) {
         expandedTitles.add(`${title} ${i}`);
       }
@@ -1285,7 +1285,7 @@ function setMarkWithDetails(title, mark, on, item, poster) {
   if (mark === 'favorite') cur.favorite = !!on;
   if (mark === 'watched') cur.watched = !!on;
   
-  // 保存完整的电影信息
+  // Save complete movie information
   if (on) {
     cur.title = item.title;
     cur.year = item.year;
@@ -1314,7 +1314,7 @@ function setState(title, state) {
 
 async function renderCards(items) {
   try {
-    // 强制只显示 3 条
+    // Force only show 3 items
     items = (items || []).slice(0, 3);
     console.log('renderCards called with:', items.length, 'items');
     cardsEl.innerHTML = '';
@@ -1328,10 +1328,10 @@ async function renderCards(items) {
     page.className = 'ticket-page';
     const moodSummary = buildMoodSummary(window.lastUserMood || '', item);
     
-    // 优先使用已保存的描述内容，如果没有则使用reason作为备用
+    // Prefer saved description content, if not use reason as fallback
     let synopsis = item.synopsis || item.savedSynopsis;
     if (!synopsis) {
-      // 如果没有保存的描述，使用reason作为备用，不再重新生成
+      // If no saved description, use reason as fallback, no longer regenerate
       synopsis = buildSynopsis(item) || 'A compelling story that matches your current mood.';
     }
     
@@ -1355,10 +1355,10 @@ async function renderCards(items) {
     const infoLine = [countries, genresStr, releaseStr, runtimeStr].filter(Boolean).join(' / ');
     const ratingNum = (item.rating != null && Number.isFinite(Number(item.rating))) ? Number(item.rating).toFixed(1) : '';
     const ratingLine = ratingNum ? `<div class="ticket-stars">${stars} ${ratingNum}/10</div>` : '';
-    // 优先使用已保存的情感描述，如果没有则使用备用模板
+    // Prefer saved emotional description, if not use fallback template
     let subtitleText = item.emotionLine || item.savedEmotionLine;
     if (!subtitleText) {
-      // 如果没有保存的情感描述，使用备用模板，不再重新生成
+      // If no saved emotional description, use fallback template, no longer regenerate
       subtitleText = buildEmotionFallback(window.lastUserMood || '', item);
     }
     page.innerHTML = `
@@ -1387,7 +1387,7 @@ async function renderCards(items) {
       </article>
     `;
     cardsEl.appendChild(page);
-    // 运行时兜底：若图片加载失败或 URL 无效，替换为占位图
+    // Runtime fallback: if image load fails or URL invalid, replace with placeholder
     const img = page.querySelector('.ticket-poster img');
     const isValidUrl = (u) => /^(https?:|data:|blob:)/i.test(String(u || '').trim());
     if (!isValidUrl(img?.src)) {
@@ -1433,11 +1433,11 @@ async function renderCards(items) {
   } catch (error) {
     console.error('Error in renderCards:', error);
     console.log('Items that caused error:', items);
-    // 如果渲染出错，显示错误信息
+    // If rendering error, show error message
     cardsEl.innerHTML = '<div class="error-message">Error rendering movie cards. Please try again.</div>';
   }
 
-  // 尝试从云端拉取用户的收藏，并与本地状态合并
+  // Try to fetch user favorites from cloud and merge with local state
   try {
     const favs = await fetchCloudFavorites();
     if (Array.isArray(favs) && favs.length) {

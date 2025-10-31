@@ -67,7 +67,7 @@
     </script>
     <script type="module" src="debug.js"></script>
     <script type="module">
-      // 动态导入 Supabase，并在失败时回退为本地模式（仅读取 localStorage）
+      // Dynamically import Supabase, fallback to local mode (only read localStorage) on failure
       let supabase = window.supabaseClient || null;
       try {
         if (!supabase) {
@@ -83,14 +83,14 @@
           }));
           if (window.M2M_DEBUG) window.M2M_DEBUG.log('SUPABASE_INIT', { SUPABASE_URL });
         }
-        // 确保会话初始化
+        // Ensure session initialization
         try {
           const { data } = await supabase.auth.getSession();
           if (window.M2M_DEBUG) window.M2M_DEBUG.log('GET_SESSION', { hasUser: !!data?.session?.user, expires_at: data?.session?.expires_at });
         } catch (e) {
           if (window.M2M_DEBUG) window.M2M_DEBUG.log('GET_SESSION_ERROR', { message: e?.message || String(e) });
         }
-        // 检查手动存储的会话
+        // Check manually stored session
         (function checkSession() {
           try {
             const storedSession = localStorage.getItem('supabase.auth.token');
@@ -107,7 +107,7 @@
               return;
             }
             
-            // 检查会话是否过期
+            // Check if session is expired
             if (sessionData.expires_at && new Date(sessionData.expires_at * 1000) <= new Date()) {
               console.log('Stored session expired, redirecting to index');
               localStorage.removeItem('supabase.auth.token');
@@ -168,7 +168,7 @@
           return;
         }
         if (typeof val === 'string') {
-          // 旧数据兼容：若匹配则删除
+          // Legacy data compatibility: delete if matches
           if (val === expected) {
             delete s[title];
             saveStates(s);
@@ -306,17 +306,17 @@
         return Array.from(map.values());
       }
 
-      // 海报缓存
+      // Poster cache
       const _posterCache = new Map();
       
-      // TMDB条款要求：缓存不超过6个月
-      const TMDB_CACHE_DURATION = 6 * 30 * 24 * 60 * 60 * 1000; // 6个月（毫秒）
+      // TMDB terms require: cache no more than 6 months
+      const TMDB_CACHE_DURATION = 6 * 30 * 24 * 60 * 60 * 1000; // 6 months (milliseconds)
       
       function isCacheExpired(timestamp) {
         return Date.now() - timestamp > TMDB_CACHE_DURATION;
       }
       
-      // 清理过期的海报缓存
+      // Clean expired poster cache
       function cleanExpiredPosterCache() {
         const now = Date.now();
         for (const [key, data] of _posterCache.entries()) {
@@ -326,10 +326,10 @@
         }
       }
       
-      // 定期清理过期缓存（每小时检查一次）
+      // Periodically clean expired cache (check once per hour)
       setInterval(cleanExpiredPosterCache, 60 * 60 * 1000);
       
-      // 从 script.js 复制的海报获取函数
+      // Poster fetching function copied from script.js
       async function getTmdbPoster(title, year) {
         try {
           const response = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=1b3388b11b1c8627ffe1e6901a889c4f&query=${encodeURIComponent(title)}&year=${year || ''}`);
@@ -358,13 +358,13 @@
       async function getPosterUrl(title, year, candidate) {
         const key = `poster-${title}-${year ?? ''}`;
         
-        // 检查缓存是否存在且未过期
+        // Check if cache exists and not expired
         if (_posterCache.has(key)) {
           const cachedData = _posterCache.get(key);
           if (cachedData.timestamp && !isCacheExpired(cachedData.timestamp)) {
             return cachedData.url;
           } else {
-            // 缓存过期，删除旧缓存
+            // Cache expired, delete old cache
             _posterCache.delete(key);
           }
         }
@@ -372,7 +372,7 @@
         // 1) Try TMDB
         let poster = await getTmdbPoster(title, year);
         
-        // 若 TMDB 未找到且提供了候选链接，需校验候选是否为有效 URL
+        // If TMDB not found and candidate link provided, validate if candidate is valid URL
         const isValidUrl = (u) => {
           const s = String(u || '').trim();
           return /^(https?:|data:|blob:)/i.test(s);
@@ -385,7 +385,7 @@
         // 3) Final fallback
         if (!poster) poster = `https://picsum.photos/seed/${encodeURIComponent(title)}/300/450`;
         
-        // 存储到缓存，包含时间戳
+        // Store to cache, include timestamp
         _posterCache.set(key, {
           url: poster,
           timestamp: Date.now()
@@ -395,12 +395,12 @@
       }
 
       async function posterOf(it) {
-        // 如果有存储的海报URL，优先使用
+        // If stored poster URL exists, prefer it
         if (it.poster_url) {
           return it.poster_url;
         }
         
-        // 否则使用与主页相同的海报获取逻辑
+        // Otherwise use same poster fetching logic as homepage
         try {
           const poster = await getPosterUrl(it.title, it.year, it.posterUrl);
           return poster;
@@ -417,7 +417,7 @@
         emptyEl.hidden = !!list.length;
         if (!list.length) return;
         
-        // 并行获取所有海报URL，即使某些失败也不影响其他
+        // Fetch all poster URLs in parallel, even if some fail doesn't affect others
         const posterPromises = list.map(it => posterOf(it));
         const posterResults = await Promise.allSettled(posterPromises);
         
@@ -428,7 +428,7 @@
           const card = document.createElement('div');
           card.className = 'movie-card';
           
-          // 获取海报URL，如果失败则使用默认图片
+          // Get poster URL, use default image if fails
           const posterUrl = posterResult.status === 'fulfilled' 
             ? posterResult.value 
             : `https://picsum.photos/seed/${encodeURIComponent(it.title || 'movie')}/300/450`;
@@ -446,7 +446,7 @@
               </div>
             </div>
           `;
-          // 标记数据以便操作
+          // Mark data for operations
           card.dataset.title = it.title || '';
           card.dataset.year = it.year || '';
           card.dataset.id = it.id || '';
@@ -489,7 +489,7 @@
         const user = await getUser();
         
         if (!user) {
-          // 未登录：显示本地数据
+          // Not logged in: show local data
           const localFav = getLocalFavourites();
           const localWatched = getLocalWatched();
           console.log('Not logged in, showing local data:', { localFav, localWatched });
@@ -498,12 +498,12 @@
           return;
         }
         
-        // 已登录：获取云端数据并与本地数据合并
+        // Logged in: fetch cloud data and merge with local data
         console.log('Logged in, fetching cloud data...');
         const cloudFav = await fetchCloudMarks('favorite');
         const cloudWatched = await fetchCloudMarks('watched');
         
-        // 获取本地收藏和已看电影
+        // Get local favorites and watched movies
         const localFav = getLocalFavourites();
         const localWatched = getLocalWatched();
         
@@ -512,11 +512,11 @@
         console.log('Local data - Favorites:', localFav?.length || 0, localFav);
         console.log('Local data - Watched:', localWatched?.length || 0, localWatched);
         
-        // 合并本地和云端数据
+        // Merge local and cloud data
         const allFav = [...(cloudFav || []), ...localFav];
         const allWatched = [...(cloudWatched || []), ...localWatched];
         
-        // 去重
+        // Deduplicate
         const uniqueFav = dedupeByTitleYear(allFav);
         const uniqueWatched = dedupeByTitleYear(allWatched);
         
@@ -524,7 +524,7 @@
         console.log('Merged data - Watched:', uniqueWatched?.length || 0, uniqueWatched);
         
         await renderGrid(uniqueFav, favGrid, favCount, favEmpty);
-        // 安装移除按钮事件（取消收藏）
+        // Install remove button event (unfavorite)
         favGrid.querySelectorAll('.movie-card').forEach((card) => {
           const btn = card.querySelector('.remove-btn');
           btn?.addEventListener('click', async () => {
@@ -532,16 +532,16 @@
             const year = card.dataset.year ? Number(card.dataset.year) : undefined;
             const id = card.dataset.id ? Number(card.dataset.id) : undefined;
             
-            // 同时更新本地状态和云端状态
-            clearLocalState(title, 'wish'); // 移除本地收藏状态
-            await removeCloudMarkByTitleYear('favorite', title, year, id); // 移除云端收藏状态
+            // Update both local state and cloud state
+            clearLocalState(title, 'wish'); // Remove local favorite state
+            await removeCloudMarkByTitleYear('favorite', title, year, id); // Remove cloud favorite state
             
             await refreshAll();
           });
         });
 
         await renderGrid(uniqueWatched, watchedGrid, watchedCount, watchedEmpty);
-        // 安装移除按钮事件（取消已看）
+        // Install remove button event (unmark watched)
         watchedGrid.querySelectorAll('.movie-card').forEach((card) => {
           const btn = card.querySelector('.remove-btn');
           if (btn) btn.textContent = 'Remove';
@@ -550,27 +550,27 @@
             const year = card.dataset.year ? Number(card.dataset.year) : undefined;
             const id = card.dataset.id ? Number(card.dataset.id) : undefined;
             
-            // 同时更新本地状态和云端状态
-            clearLocalState(title, 'seen'); // 移除本地已看状态
-            await removeCloudMarkByTitleYear('watched', title, year, id); // 移除云端已看状态
+            // Update both local state and cloud state
+            clearLocalState(title, 'seen'); // Remove local watched state
+            await removeCloudMarkByTitleYear('watched', title, year, id); // Remove cloud watched state
             
             await refreshAll();
           });
         });
       }
 
-      // 本地状态变化时，实时刷新（在其他页面点击 favourite/watched 会触发）
+      // Real-time refresh when local state changes (triggered when clicking favourite/watched on other pages)
       window.addEventListener('storage', (e) => {
         if (e.key === 'm2m_states') refreshAll();
       });
 
-      // 禁用 Supabase 的认证状态监听器，我们手动管理会话
+      // Disable Supabase auth state listener, we manage session manually
       // if (supabase && supabase.auth) {
       //   supabase.auth.onAuthStateChange(async (event, sess) => {
       //     if (window.M2M_DEBUG) window.M2M_DEBUG.log('AUTH_EVENT', { event, hasUser: !!sess?.user, expires_at: sess?.expires_at });
-      //     await refreshAll();
-      //     await updateHeaderBadge();
-      //     // 根据当前用户订阅 Realtime（如果表启用）
+//     await refreshAll();
+//     await updateHeaderBadge();
+//     // Subscribe to Realtime for current user (if table enabled)
       //     try {
       //       const uid = sess?.user?.id;
       //       if (uid) {
