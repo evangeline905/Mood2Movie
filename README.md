@@ -139,17 +139,21 @@ To fully access all features (Favorites, Watched, My Movies page, Cloud Sync):
 
 ### Basic Movie Recommendation
 
-1. **Describe Your Mood**
-   - Enter how you're feeling or what type of movie you want
-   - Examples: "I'm feeling nostalgic and want something hopeful." or "Something dark and mysterious."
+1. **Describe Your Mood**  
+   - Enter how you're feeling or what type of movie you want  
+   - Examples: *"I'm feeling nostalgic and want something hopeful."* or *"Something dark and mysterious."*
 
-2. **Generate Recommendations**
-   - Click the "Generate" button
+2. **Generate Recommendations**  
+   - Click the **"Generate"** button  
    - Wait for AI to process your request (first time may take longer due to model download)
 
-3. **Explore Results**
-   - Browse through 3 personalized movie recommendations
-   - Each recommendation includes the movie poster, rating, basic details such as genre and release year, a brief plot summary, and an AI-generated explanation of why it aligns with your mood
+3. **Explore Results**  
+   - Browse through 3 personalized movie recommendations  
+   - Each recommendation includes the movie poster, rating, basic details such as genre and release year, a brief plot summary, and an AI-generated explanation of why it aligns with your mood  
+
+4. **Refresh Recommendations**  
+   - If you're not satisfied with the current batch, click **"Refresh Batch"** to generate new emotional matches.
+
 
 ### Account Features
 
