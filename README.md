@@ -118,7 +118,7 @@ To fully access all features (Favorites, Watched, My Movies page, Cloud Sync):
 - **ID:** mood2movie.test  
 - **Password:** chromeapi  
 
-(You can also use your own Google account to sign in.)
+(Google account sign-in is also available)
 
 > Note: The demo account is for evaluation purposes only. Data may reset periodically.
 
