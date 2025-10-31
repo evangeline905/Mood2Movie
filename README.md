@@ -336,7 +336,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] **Multi-language AI responses** - Support for Chinese, Spanish, French
 - [ ] **Advanced filtering** - Genre, year, rating filters
 - [ ] **Social features** - Share recommendations with friends
-- [ ] **Mobile app** - Native iOS and Android apps
 - [ ] **Voice input** - Speech-to-text for mood descriptions
 - [ ] **Recommendation history** - Track and analyze your preferences
 
