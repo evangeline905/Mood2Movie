@@ -62,7 +62,7 @@ Mood2Movie Website
 - **🔐 Auth Page** - Secure Google login with session persistence
 - **👤 Profile Page** - Personal movie collection management
 - **🔄 Cross-page Sync** - Real-time data synchronization between pages
-- **📱 Responsive Design** - Optimized for desktop and mobile devices
+- **💻 Chrome Desktop Only** - Optimized for Chrome desktop browsers
 
 ## 🛠️ Tech Stack
 
@@ -89,9 +89,12 @@ Mood2Movie Website
 
 ### Prerequisites
 
-- **Chrome 138+** with experimental features enabled
+- **Chrome 138+ Desktop** - Chrome Prompt API is only available on desktop Chrome (Windows, macOS, Linux), not on mobile devices or other browsers
+- **Experimental features enabled** - Must enable Chrome Prompt API flags
 - **Node.js 16+** for local development
 - **Google Account** for authentication (optional)
+
+> ⚠️ **Note:** This app requires Chrome desktop browser only. The Chrome Prompt API is not supported on mobile Chrome or other browsers.
 
 ### Installation
 
@@ -303,7 +306,7 @@ We welcome contributions! Here's how you can help:
 
 - Follow existing code style and conventions
 - Add comments for complex logic
-- Test on multiple browsers and devices
+- Test on Chrome desktop browsers (Windows, macOS, Linux)
 - Update documentation for new features
 
 ## 📄 License
