@@ -111,6 +111,14 @@ Mood2Movie Website
 
 ## 🎯 Usage
 
+**Demo Account for Testing**
+To fully access all features (Favorites, My Movies page, Cloud Sync),
+- ID: mood2movie.test
+- Password: chromeapi
+(You can also use your own Google account to sign in.)
+
+> Note: The demo account is for evaluation purposes only. Data may reset periodically.
+
 ### Basic Movie Recommendation
 
 1. **Describe Your Mood**
