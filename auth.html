@@ -17,6 +17,12 @@
       .oauth-logo { width: 18px; height: 18px; }
       .auth-status { color: #a06146; font-weight: 600; }
       .auth-help { font-size: 13px; color: #8a5a4d; }
+      .test-login-form { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; padding-top: 16px; border-top: 1px solid #ffe1d0; }
+      .test-login-form input { padding: 10px 12px; border-radius: 8px; border: 1px solid #ffe1d0; background: #fff; color: #442b2b; font-size: 14px; }
+      .test-login-form input:focus { outline: none; border-color: #ff935c; }
+      .test-login-form button { padding: 10px 14px; border-radius: 8px; border: 1px solid #ffe1d0; background: #fff7f2; color: #8a5a4d; font-weight: 600; cursor: pointer; }
+      .test-login-form button:hover { filter: brightness(1.04); }
+      .test-login-label { font-size: 12px; color: #a06146; font-weight: 600; margin-bottom: 4px; }
     </style>
   </head>
   <body>
@@ -39,6 +45,14 @@
             Continue with Google
           </button>
           <button id="signout" class="oauth-btn" type="button">Sign out</button>
+          
+          <div class="test-login-form">
+            <div class="test-login-label">Test Account Login</div>
+            <input type="text" id="test-username" placeholder="Username" />
+            <input type="password" id="test-password" placeholder="Password" />
+            <button id="test-login-btn" type="button">Sign in with Test Account</button>
+          </div>
+          
           <a class="btn-link" href="index.html?restore=true" aria-label="Back to Home">← Back to Home</a>
           <div id="whoami" class="auth-status">Not signed in</div>
         </div>
@@ -64,6 +78,9 @@
       const who = document.getElementById('whoami');
       const signOutBtn = document.getElementById('signout');
       const googleBtn = document.getElementById('google-signin');
+      const testLoginBtn = document.getElementById('test-login-btn');
+      const testUsernameInput = document.getElementById('test-username');
+      const testPasswordInput = document.getElementById('test-password');
 
       async function refreshUser() {
         try {
@@ -104,6 +121,71 @@
           localStorage.removeItem('supabase.auth.token');
         } finally { 
           await refreshUser(); 
+        }
+      });
+
+      // Test account login
+      async function loginWithTestAccount() {
+        const username = testUsernameInput.value.trim();
+        const password = testPasswordInput.value;
+
+        // Validate test credentials
+        if (username === 'mood2movie.test' && password === 'chromeapi') {
+          try {
+            // Create a test user object similar to Supabase format
+            const testUser = {
+              id: 'test-user-' + Date.now(),
+              email: 'mood2movie.test@mood2movie.local',
+              user_metadata: {
+                full_name: 'mood2movie.test'
+              }
+            };
+
+            // Create session data
+            const expiresAt = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60); // 30 days from now
+            const sessionData = {
+              access_token: 'test-token-' + Date.now(),
+              refresh_token: 'test-refresh-' + Date.now(),
+              expires_at: expiresAt,
+              user: testUser
+            };
+
+            // Save session to localStorage
+            localStorage.setItem('supabase.auth.token', JSON.stringify(sessionData));
+            console.log('Test account login successful');
+            
+            // Update UI
+            who.textContent = `Signed in as mood2movie.test`;
+            
+            // Show success message briefly before redirect
+            await refreshUser();
+            
+            // Redirect to index page
+            setTimeout(() => {
+              window.location.replace('index.html?restore=true');
+            }, 500);
+          } catch (error) {
+            console.error('Error saving test session:', error);
+            alert('Login failed. Please try again.');
+          }
+        } else {
+          alert('Invalid username or password. Please use:\nUsername: mood2movie.test\nPassword: chromeapi');
+          testPasswordInput.value = '';
+        }
+      }
+
+      // Test login button click handler
+      testLoginBtn.addEventListener('click', loginWithTestAccount);
+
+      // Allow Enter key to submit test login form
+      testUsernameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          testPasswordInput.focus();
+        }
+      });
+      testPasswordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          loginWithTestAccount();
         }
       });
 
