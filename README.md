@@ -1,21 +1,32 @@
 # 🎬 Mood2Movie
 
+🌐 **Live Demo:** [https://mood2movie-sandy.vercel.app](https://mood2movie-sandy.vercel.app)
+
 > **Your vibe leads the way to your next favorite movie.**
 
-Mood2Movie is an AI-powered movie recommendation platform that uses Chrome's built-in Prompt API to generate personalized movie suggestions based on your mood, preferences, and viewing history. Simply describe how you're feeling or what kind of movie you want to watch, and our AI will curate the perfect recommendations for you.
+> ⚠️ **Platform Requirement:**  
+> Mood2Movie requires **Chrome 138+ desktop version** (Windows, macOS, or Linux).  
+> The Chrome Prompt API is **not available on mobile browsers**, so AI movie recommendations will only work on desktop Chrome.
+
+Mood2Movie is an AI-powered movie recommendation platform that uses Chrome’s built-in Prompt API to generate personalized movie suggestions based on your mood, preferences, and viewing history. Simply describe how you're feeling or what kind of movie you want to watch, and the AI will curate the perfect recommendations for you.
+
+---
 
 ## ✨ Features
 
-- 🧠 **AI-Powered Recommendations** - Uses Chrome's LanguageModel API for intelligent movie suggestions
-- 🎭 **Mood-Based Matching** - Describe your mood and get movies that match your vibe
-- 💾 **Cloud Sync** - Save favorites and watch history with Google account integration
-- 🎨 **Beautiful UI** - Movie ticket-inspired design with smooth animations
-- 📱 **Responsive Design** - Works perfectly on desktop and mobile devices
-- 🔄 **Real-time Generation** - Stream AI responses for instant recommendations
-- 🎯 **Smart Filtering** - Avoids recommending movies you've already watched
-- 🌍 **Multi-language Support** - Supports English and Chinese interfaces
+- 🧠 **AI-Powered Recommendations** — Uses Chrome's LanguageModel API for intelligent movie suggestions  
+- 🎭 **Mood-Based Matching** — Describe your mood and get movies that match your vibe  
+- 💾 **Cloud Sync** — Save favorites and watch history with Google account integration  
+- 🎨 **Beautiful UI** — Movie ticket-inspired design with smooth animations  
+- 💻 **Chrome Desktop Only** — Requires Chrome 138+ desktop version (Chrome Prompt API not available on mobile)  
+- 🔄 **Real-time Generation** — Stream AI responses for instant recommendations  
+- 🎯 **Smart Filtering** — Avoids recommending movies you've already watched  
+- 🌍 **Multi-language Support** — Supports English and Chinese interfaces
+
+---
 
 ## 🌐 Website Structure
+
 
 ```
 Mood2Movie Website
